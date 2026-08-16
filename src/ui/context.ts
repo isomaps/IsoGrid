@@ -28,6 +28,17 @@ export interface GridContext {
   /** Notifie l'hôte d'un changement d'état persistable. */
   emitState(): void
 
+  /**
+   * Encadre un redimensionnement à la souris.
+   *
+   * Entre les deux, un changement de largeur ne redessine plus : il ne fait
+   * que réappliquer la géométrie aux cellules existantes. Sans cela, chaque
+   * pixel parcouru reconstruisait l'en-tête — donc la poignée qu'on tient —
+   * et repeuplait tout le corps.
+   */
+  beginColumnResize(): void
+  endColumnResize(): void
+
   /** Valeurs distinctes d'une colonne, pour un filtre `set`. */
   fetchSetValues(columnId: string): Promise<SetFilterOption[]>
 

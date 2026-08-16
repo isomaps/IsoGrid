@@ -179,7 +179,7 @@ export class HeaderRenderer {
 
     /* --- poignée de redimensionnement --- */
     if (def.resizable !== false) {
-      cell.append(this.buildResizeHandle(column))
+      cell.append(this.buildResizeHandle(column, cell))
     }
 
     /* --- déplacement --- */
@@ -194,7 +194,11 @@ export class HeaderRenderer {
   /* Redimensionnement                                                     */
   /* -------------------------------------------------------------------- */
 
-  private buildResizeHandle(column: RenderColumn): HTMLElement {
+  /**
+   * @param cell En-tête portant la poignée. On en a besoin pour neutraliser
+   *   son `draggable` le temps du geste (voir plus bas).
+   */
+  private buildResizeHandle(column: RenderColumn, cell: HTMLElement): HTMLElement {
     const handle = el('div', {
       class: `${NS}-resize-handle`,
       attrs: { role: 'separator', 'aria-orientation': 'vertical', 'aria-label': column.id },
@@ -205,22 +209,39 @@ export class HeaderRenderer {
       e.stopPropagation()
       const startX = e.clientX
       const startWidth = column.width
-      handle.setPointerCapture(e.pointerId)
+
+      // L'en-tête est `draggable` pour permettre de DÉPLACER la colonne, et
+      // la poignée est son enfant. `preventDefault()` sur `pointerdown`
+      // n'empêche pas le glisser natif : celui-ci démarre au premier
+      // mouvement, et il ANNULE la capture du pointeur — `pointercancel`
+      // partait aussitôt, donc le redimensionnement se terminait avant
+      // d'avoir bougé d'un pixel. On coupe donc `draggable` pendant le geste,
+      // et on le rétablit tel qu'il était ensuite.
+      const draggableAvant = cell.draggable
+      cell.draggable = false
+
+      // Les écouteurs vivent sur le DOCUMENT, pas sur la poignée : celle-ci
+      // peut disparaître en cours de geste (un ré-rendu reconstruit
+      // l'en-tête), et des écouteurs attachés à un nœud détaché ne reçoivent
+      // plus rien. Pour la même raison, pas de `setPointerCapture` : la
+      // capture se perdrait avec le nœud.
+      this.ctx.beginColumnResize()
       document.body.classList.add(`${NS}-resizing`)
 
       const onMove = (ev: PointerEvent) => {
         this.ctx.columns.setColumnWidth(column.id, startWidth + (ev.clientX - startX))
       }
       const onUp = () => {
-        handle.removeEventListener('pointermove', onMove)
-        handle.removeEventListener('pointerup', onUp)
-        handle.removeEventListener('pointercancel', onUp)
+        document.removeEventListener('pointermove', onMove)
+        document.removeEventListener('pointerup', onUp)
+        document.removeEventListener('pointercancel', onUp)
+        cell.draggable = draggableAvant
         document.body.classList.remove(`${NS}-resizing`)
-        this.ctx.emitState()
+        this.ctx.endColumnResize()
       }
-      handle.addEventListener('pointermove', onMove)
-      handle.addEventListener('pointerup', onUp)
-      handle.addEventListener('pointercancel', onUp)
+      document.addEventListener('pointermove', onMove)
+      document.addEventListener('pointerup', onUp)
+      document.addEventListener('pointercancel', onUp)
     })
 
     // Double-clic = ajustement au contenu, comme dans un tableur.

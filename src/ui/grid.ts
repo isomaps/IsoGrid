@@ -64,6 +64,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private renderedRows = new Map<number, HTMLElement>()
   private scrollFrame = 0
   private destroyed = false
+  /** Vrai entre le clic et le relâchement d'une poignée de redimensionnement. */
+  private resizingColumns = false
   private lastDataSignature = ''
   private lastFilterSignature = ''
   private warnedRowIds = false
@@ -121,6 +123,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       requestRender: () => this.render(),
       reload: () => this.reload(),
       emitState: () => this.emitState(),
+      beginColumnResize: () => { this.resizingColumns = true },
+      endColumnResize: () => {
+        this.resizingColumns = false
+        this.render()
+        this.emitState()
+      },
       fetchSetValues: (columnId) => this.fetchSetValues(columnId),
       selectAllCheckbox: options.rowSelection === 'multiple'
         ? () => this.buildSelectAllCheckbox()
@@ -531,6 +539,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private onColumnModelChange(): void {
     if (this.destroyed) return
 
+    // Redimensionnement en cours : seule la géométrie bouge. On la réapplique
+    // aux cellules déjà là plutôt que de tout reconstruire — reconstruire
+    // détruirait la poignée que l'utilisateur tient, et le geste s'arrêterait
+    // au premier pixel. L'état n'est émis qu'au relâchement, pas à chaque
+    // pixel parcouru.
+    if (this.resizingColumns) {
+      this.applyColumnGeometry()
+      return
+    }
+
     // Changer un filtre change l'ensemble des lignes : en mode `exclude`,
     // « tout sauf ces trois-là » désignerait alors silencieusement d'autres
     // lignes. Un tri, lui, ne fait que réordonner — la sélection reste juste.
@@ -581,6 +599,31 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.toolbar?.syncFilterCount()
     this.renderStatus()
     this.renderOverlay()
+  }
+
+  /**
+   * Réapplique largeurs et décalages collants aux cellules DÉJÀ rendues.
+   *
+   * Le modèle de colonnes reste la source de vérité : il a déjà recalculé les
+   * `stickyOffset`, on ne fait que les recopier dans le DOM. C'est ce qui
+   * permet de redimensionner une colonne épinglée sans que les suivantes se
+   * décalent de travers.
+   *
+   * L'en-tête de la colonne de sélection ne porte pas de `data-col-id` et
+   * n'est donc pas visité — sans conséquence : elle est en première position,
+   * son décalage vaut toujours zéro, et elle n'est pas redimensionnable.
+   */
+  private applyColumnGeometry(): void {
+    for (const column of this.columnModel.getRenderColumns()) {
+      const selector = `[data-col-id="${CSS.escape(column.id)}"]`
+      for (const cell of Array.from(this.root.querySelectorAll<HTMLElement>(selector))) {
+        cell.style.width = `${column.width}px`
+        if (!column.pinned) continue
+        if (column.pinned === 'start') cell.style.left = `${column.stickyOffset}px`
+        else cell.style.right = `${column.stickyOffset}px`
+      }
+    }
+    this.syncWidths()
   }
 
   /** Aligne les largeurs du corps et de l'en-tête sur le total des colonnes. */
