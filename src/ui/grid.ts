@@ -27,7 +27,7 @@ import { NS, el, getPath, renderIcon } from './dom'
 
 const DEFAULTS = {
   rowHeight: 36,
-  headerHeight: 40,
+  headerHeight: 48,
   blockSize: 100,
   maxBlocksInCache: 20,
   defaultColumnWidth: 160,

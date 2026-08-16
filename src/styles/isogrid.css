@@ -8,7 +8,7 @@
   /* Surfaces */
   --isg-bg: #ffffff;
   --isg-bg-alt: #f8fafc;
-  --isg-bg-header: #f1f5f9;
+  --isg-bg-header: #fbfbfb;
   --isg-bg-hover: #f1f5f9;
   --isg-bg-elevated: #ffffff;
   --isg-bg-skeleton: #e2e8f0;
@@ -39,6 +39,9 @@
   /* Rythme */
   --isg-font: inherit;
   --isg-font-size: 13px;
+  /* L'en-tête se lit avant le contenu : il porte sa propre taille, un cran
+     au-dessus des cellules. */
+  --isg-header-font-size: 14px;
   --isg-cell-padding: 10px;
   --isg-sidebar-width: 260px;
 
@@ -225,14 +228,14 @@ svg.isg-icon { font-size: 1.05em; }
   position: sticky;
   top: 0;
   z-index: 4;
-  background: var(--isg-bg);
+  background: var(--isg-bg-header);
 }
 
 .isg-header-row {
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid var(--isg-border);
-  background: var(--isg-bg);
+  background: var(--isg-bg-header);
 }
 .isg-header-row-group .isg-hcell { font-weight: 600; justify-content: center; }
 
@@ -247,8 +250,9 @@ svg.isg-icon { font-size: 1.05em; }
   flex: none;
   padding: 0 var(--isg-cell-padding);
   font-weight: 500;
+  font-size: var(--isg-header-font-size);
   color: var(--isg-fg);
-  background: var(--isg-bg);
+  background: var(--isg-bg-header);
   user-select: none;
   overflow: hidden;
 }
@@ -263,7 +267,7 @@ svg.isg-icon { font-size: 1.05em; }
 }
 .isg-header-row-group .isg-hcell::before { top: 20%; height: 60%; }
 .isg-hcell:focus-visible { outline: 2px solid var(--isg-accent); outline-offset: -2px; }
-.isg-hcell-empty { background: var(--isg-bg); }
+.isg-hcell-empty { background: var(--isg-bg-header); }
 
 .isg-hcell-main {
   display: flex;
@@ -392,7 +396,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-row:hover .isg-pinned-start,
 .isg-row:hover .isg-pinned-end { background: var(--isg-bg-hover); }
 .isg-hcell.isg-pinned-start,
-.isg-hcell.isg-pinned-end { background: var(--isg-bg); }
+.isg-hcell.isg-pinned-end { background: var(--isg-bg-header); }
 
 .isg-pin-edge-start { box-shadow: var(--isg-shadow-pin); }
 .isg-pin-edge-end { box-shadow: var(--isg-shadow-pin-end); }
