@@ -8,8 +8,10 @@
  */
 
 import type { SelectionSnapshot, SelectionState } from './selection'
+import type { AggFunc } from './grouping'
 
 export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState } from './selection'
+export type { AggFunc, BuiltInAggFunc, DisplayRow, GroupNode } from './grouping'
 
 /* ------------------------------------------------------------------------ */
 /* Colonnes                                                                  */
@@ -106,6 +108,16 @@ export interface ColumnDef<TRow = AnyRow> {
    */
   filterValues?: SetFilterOption[] | (() => Promise<SetFilterOption[]>)
 
+  /**
+   * Agrégat calculé pour cette colonne sur chaque groupe : `'sum'`, `'avg'`,
+   * `'min'`, `'max'`, `'count'`, `'first'`, `'last'`, ou une fonction.
+   * Sans effet tant qu'aucun groupage n'est actif.
+   */
+  aggFunc?: AggFunc
+
+  /** Autorise le groupage par cette colonne. Défaut : true. */
+  enableRowGroup?: boolean
+
   /** Métadonnées libres, transmises telles quelles au serveur. */
   meta?: Record<string, unknown>
 }
@@ -195,6 +207,10 @@ export interface GridState {
   filters: Record<string, ColumnFilterModel>
   /** Recherche globale libre (barre d'outils). */
   quickFilter: string
+  /** Colonnes de groupage, dans l'ordre des niveaux. */
+  rowGroup: string[]
+  /** Chemins des groupes dépliés. */
+  expandedGroups: string[]
 }
 
 /* ------------------------------------------------------------------------ */
@@ -364,6 +380,30 @@ export interface IsoGridOptions<TRow = AnyRow> {
   /** Appelé à chaque changement de sélection. */
   onSelectionChanged?: (selection: SelectionSnapshot, grid: IsoGridApi<TRow>) => void
 
+  /**
+   * Colonnes de groupage initiales, dans l'ordre des niveaux.
+   *
+   * ⚠️ Le groupage n'existe qu'en mode client : il exige l'ensemble des
+   * lignes en mémoire. En mode serveur, l'option est ignorée et un
+   * avertissement est émis.
+   */
+  rowGroup?: string[]
+
+  /** Niveaux ouverts au départ. `0` = tout replié (défaut), `-1` = tout déplié. */
+  groupDefaultExpanded?: number
+
+  /**
+   * Zone où déposer des colonnes pour les grouper. `true` l'affiche en
+   * permanence, `'whenGrouping'` seulement quand un groupage est actif.
+   */
+  groupPanel?: boolean | 'whenGrouping'
+
+  /** Largeur de la colonne de groupe. Défaut : 240. */
+  groupColumnWidth?: number
+
+  /** Appelé quand les colonnes de groupage changent. */
+  onRowGroupChanged?: (columnIds: string[], grid: IsoGridApi<TRow>) => void
+
   sidebar?: false | SidebarOptions
   toolbar?: false | ToolbarOptions
   /**
@@ -449,6 +489,12 @@ export interface IsoGridApi<TRow = AnyRow> {
   /** Recharge en repartant du haut (après un changement de tri/filtre). */
   reload(): void
   setRows(rows: TRow[]): void
+  /**
+   * Nombre de lignes de DONNÉES après filtrage — les lignes de groupe n'y
+   * comptent pas. C'est le chiffre affiché dans la barre d'état et celui
+   * qu'attend un hôte qui demande « combien d'enregistrements ». `null` tant
+   * que le serveur n'a pas répondu.
+   */
   getDisplayedRowCount(): number | null
   /** Lignes actuellement en cache, dans l'ordre d'affichage. */
   getLoadedRows(): TRow[]
@@ -472,6 +518,14 @@ export interface IsoGridApi<TRow = AnyRow> {
   /** Sélectionne tout le jeu filtré, lignes non chargées comprises. */
   selectAll(): void
   deselectAll(): void
+
+  /* --- groupage --- */
+  getRowGroup(): string[]
+  setRowGroup(columnIds: string[]): void
+  addRowGroup(columnId: string): void
+  removeRowGroup(columnId: string): void
+  expandAllGroups(): void
+  collapseAllGroups(): void
 
   /* --- divers --- */
   setLocale(locale: LocaleCode): void

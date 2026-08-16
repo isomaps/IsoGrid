@@ -8,6 +8,7 @@ import {
   SELECTION_COLUMN_ID, SelectionModel,
   type SelectionSnapshot, type SelectionState,
 } from '../core/selection'
+import { GROUP_COLUMN_ID, GroupingModel, type DisplayRow } from '../core/grouping'
 import { Translator, resolveLocale } from '../core/i18n'
 import { BlockCache, createHttpDatasource } from '../datasource/server'
 import { ClientDatasource } from '../datasource/client'
@@ -19,6 +20,7 @@ import type { GridContext } from './context'
 import { HeaderRenderer } from './header'
 import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
+import { GroupPanel } from './group-panel'
 import { ContextMenu, type ContextMenuOptions } from './context-menu'
 import { NS, el, getPath, renderIcon } from './dom'
 
@@ -29,6 +31,7 @@ const DEFAULTS = {
   maxBlocksInCache: 20,
   defaultColumnWidth: 160,
   selectionColumnWidth: 44,
+  groupColumnWidth: 240,
   /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
   overscan: 6,
 } as const
@@ -40,6 +43,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private cache: BlockCache<TRow>
   private clientSource?: ClientDatasource<TRow>
   private selection: SelectionModel
+  private grouping: GroupingModel<TRow>
   /** Dernière ligne cochée, pour la sélection de plage au Maj-clic. */
   private lastSelectedIndex: number | null = null
   private ctx: GridContext
@@ -53,6 +57,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private headerRenderer: HeaderRenderer
   private toolbar?: Toolbar
   private sidebar?: Sidebar
+  private groupPanel?: GroupPanel
   private contextMenu?: ContextMenu
 
   /* --- état de rendu --- */
@@ -71,12 +76,20 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.t = new Translator(resolveLocale(options.locale), options.messages)
 
     this.selection = new SelectionModel(() => this.onSelectionChange())
+    this.grouping = new GroupingModel<TRow>({ defaultExpanded: options.groupDefaultExpanded })
+
+    const initialGroups = options.initialState?.rowGroup ?? options.rowGroup ?? []
+    if (initialGroups.length > 0) this.grouping.setGroupBy(initialGroups)
 
     this.columnModel = new ColumnModel({
       columns: options.columns as ColumnDef[],
       selectionColumn: options.rowSelection === 'multiple'
         ? { width: options.selectionColumnWidth ?? DEFAULTS.selectionColumnWidth }
         : false,
+      groupColumn: this.grouping.isActive()
+        ? { width: options.groupColumnWidth ?? DEFAULTS.groupColumnWidth }
+        : false,
+      groupedColumnIds: this.grouping.getGroupBy(),
       defaultColumn: options.defaultColumn as Partial<ColumnDef>,
       defaultColumnWidth: options.defaultColumnWidth ?? DEFAULTS.defaultColumnWidth,
       initialState: options.initialState,
@@ -154,6 +167,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       root.append(this.toolbar.element)
     }
 
+    if (this.options.groupPanel) {
+      this.groupPanel = new GroupPanel(this.ctx, this.options.groupPanel === true ? true : 'whenGrouping')
+      root.append(this.groupPanel.element)
+    }
+
     this.bodyEl = el('div', { class: `${NS}-body`, attrs: { role: 'rowgroup' } })
     this.overlay = el('div', { class: `${NS}-overlay` })
 
@@ -189,6 +207,69 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       this.resizeObserver.observe(this.viewport)
     }
     return root
+  }
+
+  /* -------------------------------------------------------------------- */
+  /* Groupage                                                              */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * Reconstruit l'arbre de groupes.
+   *
+   * Le groupage exige l'ensemble des lignes : on les prend directement à la
+   * source client, sans passer par le cache par blocs qui n'en détient qu'une
+   * fenêtre.
+   */
+  private rebuildGroups(): void {
+    if (!this.grouping.isActive()) return
+    if (!this.clientSource) return
+    const state = this.columnModel.getState()
+    const rows = this.clientSource.getResolvedRows({
+      sort: state.sort, filters: state.filters, quickFilter: state.quickFilter,
+    })
+    this.grouping.build(rows, this.columnModel.getAllDefs() as ColumnDef<TRow>[])
+  }
+
+  /** Nombre de lignes à représenter : groupes compris quand le groupage est actif. */
+  private displayRowCount(): number {
+    return this.grouping.isActive()
+      ? this.grouping.getDisplayRowCount()
+      : this.cache.getVirtualRowCount()
+  }
+
+  private displayRow(index: number): DisplayRow<TRow> | undefined {
+    if (this.grouping.isActive()) return this.grouping.getDisplayRow(index)
+    const row = this.cache.getRow(index)
+    return row ? { kind: 'leaf', row, level: 0 } : undefined
+  }
+
+  /**
+   * Applique un nouveau groupage.
+   *
+   * Le modèle de colonnes est reconstruit : la colonne d'arborescence doit
+   * apparaître ou disparaître, et les colonnes groupées être masquées.
+   */
+  private applyRowGroup(columnIds: string[]): void {
+    if (columnIds.length > 0 && !this.clientSource) {
+      console.warn(
+        '[IsoGrid] rowGroup est ignoré en mode serveur : le groupage exige '
+        + "l'ensemble des lignes en mémoire.",
+      )
+      return
+    }
+
+    this.grouping.setGroupBy(columnIds)
+    this.columnModel.setGroupingColumns(
+      columnIds,
+      columnIds.length > 0
+        ? { width: this.options.groupColumnWidth ?? DEFAULTS.groupColumnWidth }
+        : false,
+    )
+    this.rebuildGroups()
+    this.selection.clear()
+    this.render()
+    this.emitState()
+    this.options.onRowGroupChanged?.(columnIds, this)
   }
 
   /* -------------------------------------------------------------------- */
@@ -322,6 +403,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private onDataChange(): void {
     if (this.destroyed) return
     if (!this.warnedRowIds) { this.warnedRowIds = true; this.warnUnstableRowIds() }
+    this.rebuildGroups()
     this.renderBody()
     this.renderStatus()
     this.renderOverlay()
@@ -342,6 +424,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.renderedRows.clear()
     this.bodyEl.replaceChildren()
     this.renderBody()
+    this.groupPanel?.render()
     this.sidebar?.render()
     this.toolbar?.syncQuickFilter()
     this.toolbar?.syncFilterCount()
@@ -383,14 +466,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   private totalRowCount(): number {
-    return this.cache.getVirtualRowCount()
+    return this.displayRowCount()
   }
 
   private refreshVisibleRange(): void {
     if (this.destroyed) return
     const { start, end } = this.visibleRange()
     this.cache.requestContext = this.buildRequestContext()
-    this.cache.ensureRange(start, end)
+    // En groupage, les lignes viennent de l'arbre en mémoire : demander des
+    // blocs au cache n'aurait aucun effet sur ce qui est affiché.
+    if (!this.grouping.isActive()) this.cache.ensureRange(start, end)
     this.renderBody()
   }
 
@@ -432,17 +517,19 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const columns = this.columnModel.getRenderColumns()
     for (let i = start; i < end; i++) {
       const existing = this.renderedRows.get(i)
-      const row = this.cache.getRow(i)
+      const display = this.displayRow(i)
 
       // Une ligne squelette est remplacée dès que sa donnée arrive.
       if (existing) {
         const wasSkeleton = existing.dataset.skeleton === '1'
-        if (!wasSkeleton || !row) continue
+        if (!wasSkeleton || !display) continue
         existing.remove()
         this.renderedRows.delete(i)
       }
 
-      const node = this.buildRow(i, row, columns, rowHeight)
+      const node = display?.kind === 'group'
+        ? this.buildGroupRow(i, display, columns, rowHeight)
+        : this.buildRow(i, display?.row, columns, rowHeight, display?.level ?? 0)
       this.renderedRows.set(i, node)
       this.bodyEl.append(node)
     }
@@ -453,6 +540,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     row: TRow | undefined,
     columns: RenderColumn[],
     rowHeight: number,
+    level = 0,
   ): HTMLElement {
     const selected = row != null && this.isSelectionEnabled()
       && this.selection.isSelected(this.rowId(row, index))
@@ -474,7 +562,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     if (!row) node.dataset.skeleton = '1'
 
     for (const column of columns) {
-      node.append(this.buildCell(column, row, index))
+      node.append(this.buildCell(column, row, index, level))
     }
 
     if (row) {
@@ -491,7 +579,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return node
   }
 
-  private buildCell(column: RenderColumn, row: TRow | undefined, rowIndex: number): HTMLElement {
+  private buildCell(
+    column: RenderColumn,
+    row: TRow | undefined,
+    rowIndex: number,
+    level = 0,
+  ): HTMLElement {
     const def = column.def as ColumnDef<TRow>
     const cell = el('div', {
       class: [
@@ -514,6 +607,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     if (column.id === SELECTION_COLUMN_ID) {
       if (row) cell.append(this.buildRowCheckbox(row, rowIndex))
+      return cell
+    }
+
+    // Sur une feuille, la colonne d'arborescence ne porte rien d'autre que le
+    // décalage qui la rattache visuellement à son groupe.
+    if (column.id === GROUP_COLUMN_ID) {
+      cell.style.paddingLeft = `${12 + level * 18}px`
       return cell
     }
 
@@ -553,6 +653,148 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       })
     }
     return cell
+  }
+
+  /**
+   * Ligne d'en-tête de groupe : chevron, libellé, effectif, puis les agrégats
+   * dans leurs colonnes respectives.
+   */
+  private buildGroupRow(
+    index: number,
+    display: Extract<DisplayRow<TRow>, { kind: 'group' }>,
+    columns: RenderColumn[],
+    rowHeight: number,
+  ): HTMLElement {
+    const { node: group, expanded } = display
+
+    const row = el('div', {
+      class: `${NS}-row ${NS}-row-group ${NS}-row-group-l${Math.min(group.level, 4)}`,
+      attrs: {
+        role: 'row',
+        'aria-rowindex': index + 1,
+        'aria-expanded': String(expanded),
+        'data-group-path': group.path,
+      },
+      style: { height: `${rowHeight}px`, transform: `translateY(${index * rowHeight}px)` },
+    })
+
+    for (const column of columns) {
+      const cell = el('div', {
+        class: [
+          `${NS}-cell`,
+          column.pinned ? `${NS}-pinned-${column.pinned}` : '',
+          column.isLastPinnedStart ? `${NS}-pin-edge-start` : '',
+          column.isFirstPinnedEnd ? `${NS}-pin-edge-end` : '',
+        ].filter(Boolean).join(' '),
+        attrs: { role: 'gridcell', 'data-col-id': column.id },
+        style: { width: `${column.width}px` },
+      })
+      if (column.pinned) {
+        cell.style.position = 'sticky'
+        cell.style.zIndex = '2'
+        if (column.pinned === 'start') cell.style.left = `${column.stickyOffset}px`
+        else cell.style.right = `${column.stickyOffset}px`
+      }
+
+      if (column.id === GROUP_COLUMN_ID) {
+        cell.style.paddingLeft = `${8 + group.level * 18}px`
+        cell.append(this.buildGroupToggle(group.path, expanded))
+        cell.append(el('span', {
+          class: `${NS}-group-label`,
+          text: this.formatGroupKey(group.columnId, group.key),
+        }))
+        cell.append(el('span', { class: `${NS}-group-count`, text: `(${this.t.number(group.count)})` }))
+      } else if (column.id === SELECTION_COLUMN_ID) {
+        cell.append(this.buildGroupCheckbox(group))
+      } else {
+        const agg = group.aggregates[column.id]
+        if (agg != null) {
+          const def = column.def as ColumnDef<TRow>
+          cell.classList.add(`${NS}-cell-agg`)
+          if (!def.align && def.type === 'number') cell.classList.add(`${NS}-align-right`)
+          cell.textContent = this.formatAggregate(def, agg)
+        }
+      }
+      row.append(cell)
+    }
+
+    // Toute la ligne est cliquable : viser un chevron de 12 px est pénible.
+    row.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('input')) return
+      this.toggleGroup(group.path)
+    })
+
+    return row
+  }
+
+  private buildGroupToggle(path: string, expanded: boolean): HTMLElement {
+    return el('button', {
+      class: `${NS}-group-toggle${expanded ? ` ${NS}-open` : ''}`,
+      attrs: {
+        type: 'button',
+        'aria-label': this.t.t(expanded ? 'collapseGroup' : 'expandGroup'),
+        'aria-expanded': String(expanded),
+      },
+      children: [renderIcon('chevron-right', this.options.renderIcon)],
+      on: {
+        click: (e: MouseEvent) => { e.stopPropagation(); this.toggleGroup(path) },
+      },
+    })
+  }
+
+  /** Case d'un groupe : coche ou décoche toutes ses feuilles d'un coup. */
+  private buildGroupCheckbox(group: import('../core/grouping').GroupNode<TRow>): HTMLElement {
+    const leaves = this.collectLeaves(group)
+    const ids = leaves.map((r, i) => this.rowId(r, i))
+    const selectedCount = ids.filter(id => this.selection.isSelected(id)).length
+    const all = ids.length > 0 && selectedCount === ids.length
+
+    const box = el('input', {
+      class: `${NS}-select-box`,
+      attrs: { type: 'checkbox', checked: all, 'aria-label': this.t.t('selectRow') },
+      on: {
+        click: (e: MouseEvent) => {
+          e.stopPropagation()
+          this.selection.selectRange(ids, !all)
+        },
+      },
+    })
+    box.indeterminate = selectedCount > 0 && !all
+    return box
+  }
+
+  private collectLeaves(group: import('../core/grouping').GroupNode<TRow>): TRow[] {
+    if (group.children.length === 0) return group.leaves
+    return group.children.flatMap(c => this.collectLeaves(c))
+  }
+
+  private toggleGroup(path: string): void {
+    this.grouping.toggle(path)
+    this.renderedRows.clear()
+    this.bodyEl.replaceChildren()
+    this.renderBody()
+    this.renderStatus()
+    this.emitState()
+  }
+
+  /** Libellé d'un groupe : le formateur de la colonne s'applique. */
+  private formatGroupKey(columnId: string, key: unknown): string {
+    const def = this.columnModel.getDef(columnId) as ColumnDef<TRow> | undefined
+    if (!def) return String(key ?? '')
+    if (key == null || key === '') return this.t.t('blankValue')
+    return this.formatValue(def, {
+      value: key, row: {} as TRow, rowIndex: -1, column: def, grid: this,
+    })
+  }
+
+  private formatAggregate(def: ColumnDef<TRow>, value: unknown): string {
+    if (typeof value === 'number' && def.type === 'number') {
+      // Les moyennes tombent rarement juste : deux décimales suffisent, mais
+      // on n'en impose pas à une somme d'entiers.
+      const decimals = Number.isInteger(value) ? 0 : 2
+      return this.t.number(value, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    }
+    return String(value ?? '')
   }
 
   private buildRowCheckbox(row: TRow, rowIndex: number): HTMLElement {
@@ -758,11 +1000,20 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   /* ==================================================================== */
 
   getState(): GridState {
-    return this.columnModel.getState()
+    return {
+      ...this.columnModel.getState(),
+      rowGroup: this.grouping.getGroupBy(),
+      expandedGroups: this.grouping.getExpanded(),
+    }
   }
 
   setState(state: Partial<GridState>): void {
     this.columnModel.setState(state)
+    if (state.rowGroup) this.applyRowGroup(state.rowGroup)
+    if (state.expandedGroups) {
+      this.grouping.setExpanded(state.expandedGroups)
+      this.render()
+    }
   }
 
   resetState(): void {
@@ -888,6 +1139,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.viewport.scrollTop = 0
     this.renderedRows.clear()
     this.bodyEl.replaceChildren()
+    this.rebuildGroups()
+    this.groupPanel?.render()
     this.headerRenderer.render()
     this.syncWidths()
     this.sidebar?.render()
@@ -913,7 +1166,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   getLoadedRows(): TRow[] {
-    return this.cache.getLoadedRows()
+    // En groupage, seules les feuilles des groupes dépliés sont à l'écran :
+    // c'est ce que « copier » et « exporter ce qui est chargé » doivent voir.
+    return this.grouping.isActive()
+      ? this.grouping.getVisibleLeaves()
+      : this.cache.getLoadedRows()
   }
 
   /* --- export --- */
@@ -1039,6 +1296,36 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   deselectAll(): void {
     this.selection.clear()
     this.lastSelectedIndex = null
+  }
+
+  /* --- groupage --- */
+
+  getRowGroup(): string[] {
+    return this.grouping.getGroupBy()
+  }
+
+  setRowGroup(columnIds: string[]): void {
+    this.applyRowGroup(columnIds)
+  }
+
+  addRowGroup(columnId: string): void {
+    const current = this.grouping.getGroupBy()
+    if (current.includes(columnId)) return
+    this.applyRowGroup([...current, columnId])
+  }
+
+  removeRowGroup(columnId: string): void {
+    this.applyRowGroup(this.grouping.getGroupBy().filter(id => id !== columnId))
+  }
+
+  expandAllGroups(): void {
+    this.grouping.expandAll()
+    this.render()
+  }
+
+  collapseAllGroups(): void {
+    this.grouping.collapseAll()
+    this.render()
   }
 
   /* --- divers --- */

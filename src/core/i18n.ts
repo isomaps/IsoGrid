@@ -16,6 +16,8 @@ export type MessageKey =
   | 'and' | 'or' | 'addCondition' | 'removeCondition'
   | 'selectAll' | 'deselectAll' | 'noValues' | 'searchValues' | 'blankValue'
   | 'selectRow' | 'selectAllRows' | 'clearSelection' | 'allRowsSelected'
+  | 'groupBy' | 'ungroup' | 'expandGroup' | 'collapseGroup'
+  | 'expandAllGroups' | 'collapseAllGroups' | 'groupPanelEmpty' | 'grouped'
   | 'copyCell' | 'copyRow' | 'copyRowWithHeaders' | 'copied' | 'copyFailed'
   | 'export' | 'exportExcel' | 'exportCsv' | 'exporting' | 'exportRowsFetched'
   | 'exportTruncated' | 'exportFailed' | 'exportNoExcelLib'
@@ -29,6 +31,14 @@ export type MessageKey =
 type Catalog = Record<MessageKey, string>
 
 const fr: Catalog = {
+  groupBy: 'Grouper par cette colonne',
+  ungroup: 'Retirer du groupage',
+  expandGroup: 'Déplier le groupe',
+  collapseGroup: 'Replier le groupe',
+  expandAllGroups: 'Tout déplier',
+  collapseAllGroups: 'Tout replier',
+  groupPanelEmpty: 'Glissez une colonne ici pour grouper les lignes',
+  grouped: 'Groupé',
   search: 'Rechercher',
   quickFilterPlaceholder: 'Rechercher…',
   noRows: 'Aucune ligne à afficher',
@@ -113,6 +123,14 @@ const fr: Catalog = {
 }
 
 const en: Catalog = {
+  groupBy: 'Group by this column',
+  ungroup: 'Remove from grouping',
+  expandGroup: 'Expand group',
+  collapseGroup: 'Collapse group',
+  expandAllGroups: 'Expand all',
+  collapseAllGroups: 'Collapse all',
+  groupPanelEmpty: 'Drag a column here to group rows',
+  grouped: 'Grouped',
   search: 'Search',
   quickFilterPlaceholder: 'Search…',
   noRows: 'No rows to display',
@@ -197,6 +215,14 @@ const en: Catalog = {
 }
 
 const de: Catalog = {
+  groupBy: 'Nach dieser Spalte gruppieren',
+  ungroup: 'Aus der Gruppierung entfernen',
+  expandGroup: 'Gruppe aufklappen',
+  collapseGroup: 'Gruppe zuklappen',
+  expandAllGroups: 'Alle aufklappen',
+  collapseAllGroups: 'Alle zuklappen',
+  groupPanelEmpty: 'Ziehen Sie eine Spalte hierher, um Zeilen zu gruppieren',
+  grouped: 'Gruppiert',
   search: 'Suchen',
   quickFilterPlaceholder: 'Suchen…',
   noRows: 'Keine Zeilen vorhanden',
@@ -281,6 +307,14 @@ const de: Catalog = {
 }
 
 const es: Catalog = {
+  groupBy: 'Agrupar por esta columna',
+  ungroup: 'Quitar de la agrupación',
+  expandGroup: 'Desplegar el grupo',
+  collapseGroup: 'Plegar el grupo',
+  expandAllGroups: 'Desplegar todo',
+  collapseAllGroups: 'Plegar todo',
+  groupPanelEmpty: 'Arrastre una columna aquí para agrupar las filas',
+  grouped: 'Agrupado',
   search: 'Buscar',
   quickFilterPlaceholder: 'Buscar…',
   noRows: 'No hay filas que mostrar',
@@ -365,6 +399,14 @@ const es: Catalog = {
 }
 
 const it: Catalog = {
+  groupBy: 'Raggruppa per questa colonna',
+  ungroup: 'Rimuovi dal raggruppamento',
+  expandGroup: 'Espandi il gruppo',
+  collapseGroup: 'Comprimi il gruppo',
+  expandAllGroups: 'Espandi tutto',
+  collapseAllGroups: 'Comprimi tutto',
+  groupPanelEmpty: 'Trascina qui una colonna per raggruppare le righe',
+  grouped: 'Raggruppato',
   search: 'Cerca',
   quickFilterPlaceholder: 'Cerca…',
   noRows: 'Nessuna riga da visualizzare',
@@ -449,6 +491,14 @@ const it: Catalog = {
 }
 
 const nl: Catalog = {
+  groupBy: 'Groeperen op deze kolom',
+  ungroup: 'Uit groepering verwijderen',
+  expandGroup: 'Groep uitvouwen',
+  collapseGroup: 'Groep samenvouwen',
+  expandAllGroups: 'Alles uitvouwen',
+  collapseAllGroups: 'Alles samenvouwen',
+  groupPanelEmpty: 'Sleep een kolom hierheen om rijen te groeperen',
+  grouped: 'Gegroepeerd',
   search: 'Zoeken',
   quickFilterPlaceholder: 'Zoeken…',
   noRows: 'Geen rijen om weer te geven',
@@ -533,6 +583,14 @@ const nl: Catalog = {
 }
 
 const pl: Catalog = {
+  groupBy: 'Grupuj według tej kolumny',
+  ungroup: 'Usuń z grupowania',
+  expandGroup: 'Rozwiń grupę',
+  collapseGroup: 'Zwiń grupę',
+  expandAllGroups: 'Rozwiń wszystko',
+  collapseAllGroups: 'Zwiń wszystko',
+  groupPanelEmpty: 'Przeciągnij tutaj kolumnę, aby zgrupować wiersze',
+  grouped: 'Zgrupowane',
   search: 'Szukaj',
   quickFilterPlaceholder: 'Szukaj…',
   noRows: 'Brak wierszy do wyświetlenia',
@@ -617,6 +675,14 @@ const pl: Catalog = {
 }
 
 const ru: Catalog = {
+  groupBy: 'Группировать по этому столбцу',
+  ungroup: 'Убрать из группировки',
+  expandGroup: 'Развернуть группу',
+  collapseGroup: 'Свернуть группу',
+  expandAllGroups: 'Развернуть все',
+  collapseAllGroups: 'Свернуть все',
+  groupPanelEmpty: 'Перетащите сюда столбец, чтобы сгруппировать строки',
+  grouped: 'Сгруппировано',
   search: 'Поиск',
   quickFilterPlaceholder: 'Поиск…',
   noRows: 'Нет строк для отображения',

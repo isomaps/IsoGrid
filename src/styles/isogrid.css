@@ -944,3 +944,108 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* ==========================================================================
+   Groupage de lignes
+   ========================================================================== */
+
+.isg-group-panel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 7px 10px;
+  min-height: 40px;
+  background: var(--isg-bg-alt);
+  border-bottom: 1px solid var(--isg-border);
+  flex: none;
+  transition: background .12s ease, box-shadow .12s ease;
+}
+.isg-group-panel.isg-hidden { display: none; }
+.isg-group-panel > .isg-icon { color: var(--isg-border-strong); font-size: 13px; }
+
+/* Le survol pendant un glisser doit être franc : sans retour visible, on ne
+   sait pas si la zone accepte le dépôt. */
+.isg-group-panel.isg-drop-active {
+  background: var(--isg-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--isg-accent);
+}
+
+.isg-group-panel-empty {
+  color: var(--isg-fg-muted);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+.isg-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: var(--isg-bg);
+  border: 1px solid var(--isg-border-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: grab;
+  max-width: 220px;
+}
+.isg-group-chip:active { cursor: grabbing; }
+.isg-group-chip.isg-dragging { opacity: .4; }
+.isg-group-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-group-chip-remove { width: 17px; height: 17px; font-size: 9px; }
+
+.isg-group-chevron { color: var(--isg-fg-muted); font-size: 9px; display: inline-flex; }
+.isg-group-clear { margin-left: auto; }
+
+/* --- lignes de groupe --- */
+
+.isg-row-group {
+  background: var(--isg-bg-alt);
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 1px solid var(--isg-border);
+}
+.isg-row-group:hover { background: var(--isg-bg-hover); }
+.isg-row-group .isg-cell { background: inherit; }
+
+/* Un aplat par niveau : la profondeur se lit sans compter les indentations. */
+.isg-row-group-l0 { box-shadow: inset 3px 0 0 0 var(--isg-accent); }
+.isg-row-group-l1 { box-shadow: inset 3px 0 0 0 var(--isg-border-strong); }
+.isg-row-group-l2,
+.isg-row-group-l3,
+.isg-row-group-l4 { box-shadow: inset 3px 0 0 0 var(--isg-border); }
+
+.isg-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-right: 5px;
+  padding: 0;
+  border: none;
+  border-radius: var(--isg-radius-sm);
+  background: transparent;
+  color: var(--isg-fg-muted);
+  cursor: pointer;
+  font-size: 10px;
+}
+.isg-group-toggle:hover { background: var(--isg-border); color: var(--isg-fg); }
+.isg-group-toggle .isg-icon { transition: transform .14s ease; }
+.isg-group-toggle.isg-open .isg-icon { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .isg-group-toggle .isg-icon { transition: none; }
+}
+
+.isg-group-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-group-count {
+  margin-left: 6px;
+  color: var(--isg-fg-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.isg-cell-agg { font-weight: 600; font-variant-numeric: tabular-nums; }

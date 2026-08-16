@@ -46,6 +46,17 @@ export class ClientDatasource<TRow = AnyRow> implements Datasource<TRow> {
     return this.cached
   }
 
+  /**
+   * Jeu complet filtré et trié.
+   *
+   * Le groupage en a besoin d'un seul tenant : construire un arbre à partir
+   * des seuls blocs chargés produirait des groupes faux. C'est légitime ici —
+   * en mode client, tout est déjà en mémoire.
+   */
+  getResolvedRows(request: Pick<DataRequest, 'sort' | 'filters' | 'quickFilter'>): TRow[] {
+    return this.resolve(request)
+  }
+
   async getRows(request: DataRequest): Promise<DataResponse<TRow>> {
     const resolved = this.resolve(request)
     return {

@@ -23,8 +23,8 @@ const columns: ColumnDef<Invoice>[] = [
     },
   },
   { id: 'owner', header: 'Gestionnaire', width: 150, filter: 'set' },
-  { id: 'amountHt', header: 'Montant HT', type: 'number', width: 130, align: 'right', group: 'Montants', exportFormat: '#,##0.00' },
-  { id: 'vat', header: 'TVA', type: 'number', width: 110, align: 'right', group: 'Montants', exportFormat: '#,##0.00' },
+  { id: 'amountHt', header: 'Montant HT', type: 'number', width: 130, align: 'right', group: 'Montants', exportFormat: '#,##0.00', aggFunc: 'sum' },
+  { id: 'vat', header: 'TVA', type: 'number', width: 110, align: 'right', group: 'Montants', exportFormat: '#,##0.00', aggFunc: 'sum' },
   {
     id: 'total',
     header: 'Total TTC',
@@ -49,10 +49,19 @@ const server = createFakeServer(rows, columns)
 const STATE_KEY = 'isogrid-demo-state'
 const saved = localStorage.getItem(STATE_KEY)
 
-const grid = new IsoGrid<Invoice>(document.querySelector('#grid')!, {
+let grid: IsoGrid<Invoice>
+
+function build(mode: 'server' | 'client') {
+  grid?.destroy()
+  grid = new IsoGrid<Invoice>(document.querySelector('#grid')!, {
   columns,
-  rowModel: 'server',
-  datasource: server,
+  ...(mode === 'server'
+    ? { rowModel: 'server' as const, datasource: server }
+    : { rowModel: 'client' as const, rows }),
+  // Le groupage exige l'ensemble des lignes en mémoire : il n'est proposé
+  // qu'en mode client.
+  groupPanel: mode === 'client' ? (true as const) : undefined,
+  groupDefaultExpanded: 0,
   locale: 'fr',
   theme: 'auto',
   blockSize: 100,
@@ -72,7 +81,11 @@ const grid = new IsoGrid<Invoice>(document.querySelector('#grid')!, {
   sidebar: { panels: ['columns', 'filters'], defaultOpen: false },
   toolbar: { quickFilter: true, quickFilterPlaceholder: 'Rechercher une facture…' },
   onRowClick: (row) => console.debug('[demo] ligne', row.number),
-})
+  })
+  ;(window as unknown as { grid: unknown }).grid = grid
+}
+
+build('server')
 
 /* --- Contrôles de la page de démonstration ------------------------------- */
 
@@ -109,5 +122,6 @@ document.querySelector<HTMLSelectElement>('#theme')!.addEventListener('change', 
   grid.setTheme((e.target as HTMLSelectElement).value as 'light' | 'dark' | 'auto')
 })
 
-// Utile pour inspecter depuis la console du navigateur.
-;(window as unknown as { grid: unknown }).grid = grid
+document.querySelector<HTMLSelectElement>('#rowmodel')!.addEventListener('change', (e) => {
+  build((e.target as HTMLSelectElement).value as 'server' | 'client')
+})

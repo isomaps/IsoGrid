@@ -4,6 +4,7 @@ import { NS, el, onDismiss, positionFloating } from './dom'
 import { openFilterPopover } from '../filters/widgets'
 import { resolveFilterConfig } from '../filters/model'
 import { SELECTION_COLUMN_ID } from '../core/selection'
+import { GROUP_COLUMN_ID } from '../core/grouping'
 
 /**
  * Rendu de l'en-tête : bandeaux de groupe, cellules de colonne, tri,
@@ -328,6 +329,23 @@ export class HeaderRenderer {
         this.ctx.columns.pinColumn(column.id, false)
         this.ctx.emitState()
       }))
+    }
+
+    // Groupage : proposé seulement si la colonne l'autorise et n'est pas déjà
+    // un niveau — et jamais sur les colonnes techniques.
+    const grouped = this.ctx.api.getRowGroup()
+    const groupable = def.enableRowGroup !== false
+      && column.id !== SELECTION_COLUMN_ID
+      && column.id !== GROUP_COLUMN_ID
+    if (groupable) {
+      menu.append(el('div', { class: `${NS}-menu-sep` }))
+      menu.append(grouped.includes(column.id)
+        ? item('close', t.t('ungroup'), () => this.ctx.api.removeRowGroup(column.id), true)
+        : item('grip', t.t('groupBy'), () => this.ctx.api.addRowGroup(column.id)))
+      if (grouped.length > 0) {
+        menu.append(item('chevron-down', t.t('expandAllGroups'), () => this.ctx.api.expandAllGroups()))
+        menu.append(item('chevron-right', t.t('collapseAllGroups'), () => this.ctx.api.collapseAllGroups()))
+      }
     }
 
     menu.append(el('div', { class: `${NS}-menu-sep` }))

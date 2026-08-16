@@ -174,6 +174,50 @@ Clair/sombre automatique (`prefers-color-scheme`), forçable via
 81 clés chacune. Une clé absente d'une langue est un bug, pas un « à
 compléter ». `messages` permet de surcharger n'importe quel libellé.
 
+## Groupage de lignes
+
+```ts
+new IsoGrid(el, {
+  rowModel: 'client',              // OBLIGATOIRE : voir la limite ci-dessous
+  rowGroup: ['city', 'status'],    // niveaux initiaux, dans l'ordre
+  groupDefaultExpanded: 0,         // 0 = tout replié, -1 = tout déplié
+  groupPanel: true,                // zone de dépôt ; 'whenGrouping' pour la masquer à vide
+  columns: [
+    { id: 'city',     header: 'Ville' },
+    { id: 'amountHt', header: 'Montant HT', type: 'number', aggFunc: 'sum' },
+  ],
+})
+```
+
+Les colonnes servant au groupage sont masquées automatiquement — leur valeur
+est déjà portée par la ligne de groupe. Une colonne d'arborescence apparaît,
+épinglée à gauche, avec chevron, libellé et effectif.
+
+**Zone de dépôt.** On y fait glisser un en-tête de colonne pour grouper. Les
+niveaux s'affichent en jetons réordonnables par glisser, chacun avec une croix
+pour le retirer. Le menu de chaque colonne propose aussi « Grouper par cette
+colonne ». Sans cette zone, le groupage n'est pas découvrable.
+
+**Agrégats.** `aggFunc` accepte `'sum'`, `'avg'`, `'min'`, `'max'`, `'count'`,
+`'first'`, `'last'`, ou une fonction `(values: unknown[]) => unknown`. Les
+valeurs non numériques sont ignorées plutôt que comptées comme zéro : une
+cellule vide ne doit pas tirer une moyenne vers le bas.
+
+```ts
+grid.getRowGroup() / setRowGroup([...]) / addRowGroup(id) / removeRowGroup(id)
+grid.expandAllGroups() / collapseAllGroups()
+```
+
+L'état (`rowGroup`, `expandedGroups`) fait partie de `GridState` : il se
+persiste et se restaure comme le reste.
+
+> ⚠️ **Mode client uniquement.** Le groupage exige l'ensemble des lignes en
+> mémoire : construire un arbre à partir des seuls blocs chargés produirait
+> des groupes faux. En mode serveur, l'option est ignorée et un avertissement
+> est émis. Le groupage serveur suppose un protocole distinct — le serveur
+> renvoie les groupes d'un niveau (`GROUP BY`), puis les enfants d'un groupe
+> déplié, avec un cache par branche.
+
 ## Sélection de lignes
 
 ```ts

@@ -14,6 +14,7 @@ import { batch, createAtom } from '@tanstack/store'
 
 import type { AnyRow, ColumnDef, GridState, PinPosition, SortModel } from './types'
 import { SELECTION_COLUMN_ID } from './selection'
+import { GROUP_COLUMN_ID } from './grouping'
 
 /**
  * Câblage de @tanstack/table-core.
@@ -66,6 +67,10 @@ export interface ColumnModelOptions {
   columns: ColumnDef[]
   /** Ajoute la colonne de cases à cocher en tête, épinglée et verrouillée. */
   selectionColumn?: { width: number } | false
+  /** Ajoute la colonne d'arborescence des groupes. */
+  groupColumn?: { width: number } | false
+  /** Colonnes servant au groupage : masquées puisque leur valeur est portée par le groupe. */
+  groupedColumnIds?: string[]
   defaultColumn?: Partial<ColumnDef>
   defaultColumnWidth: number
   initialState?: Partial<GridState>
@@ -123,6 +128,24 @@ export class ColumnModel {
     return { ...this.opts.defaultColumn, ...def }
   }
 
+  /** Définition synthétique de la colonne de groupe. */
+  private groupDef(): ColumnDef | null {
+    const cfg = this.opts.groupColumn
+    if (!cfg) return null
+    return {
+      id: GROUP_COLUMN_ID,
+      header: '',
+      width: cfg.width,
+      minWidth: 120,
+      pinned: 'start',
+      sortable: false,
+      resizable: true,
+      filter: false,
+      lockVisible: true,
+      lockPosition: true,
+    }
+  }
+
   /** Définition synthétique de la colonne de sélection. */
   private selectionDef(): ColumnDef | null {
     const cfg = this.opts.selectionColumn
@@ -154,6 +177,23 @@ export class ColumnModel {
     const out: unknown[] = []
     let currentGroup: string | null = null
     let bucket: unknown[] | null = null
+
+    const group = this.groupDef()
+    if (group) {
+      out.push({
+        id: group.id,
+        accessorKey: group.id,
+        header: '',
+        size: group.width,
+        minSize: group.minWidth,
+        maxSize: Number.MAX_SAFE_INTEGER,
+        enableSorting: false,
+        enableResizing: true,
+        enableHiding: false,
+        enablePinning: true,
+        filterFn: 'delegated' as const,
+      })
+    }
 
     const selection = this.selectionDef()
     if (selection) {
@@ -214,11 +254,14 @@ export class ColumnModel {
 
     const selection = this.selectionDef()
     if (selection) pinStart.push(selection.id)
+    const group = this.groupDef()
+    if (group) pinStart.push(group.id)
 
     // Les indications portées par les colonnes forment la base…
+    const grouped = new Set(this.opts.groupedColumnIds ?? [])
     for (const raw of this.orderedDefs) {
       const def = this.mergedDef(raw)
-      if (def.hide) visibility[def.id] = false
+      if (def.hide || grouped.has(def.id)) visibility[def.id] = false
       if (def.pinned === 'start') pinStart.push(def.id)
       if (def.pinned === 'end') pinEnd.push(def.id)
     }
@@ -235,8 +278,20 @@ export class ColumnModel {
         }
       : { start: pinStart, end: pinEnd }
 
+    // Le masquage des colonnes groupées prime sur l'état restauré : sinon une
+    // colonne réapparaîtrait en double, comme colonne ET comme niveau de groupe.
+    const restoredVisibility = { ...(init.columnVisibility ?? visibility) }
+    for (const id of grouped) restoredVisibility[id] = false
+
+    const startPins = restoredPinning.start
+    if (group && !startPins.includes(group.id)) {
+      restoredPinning.start = selection && startPins[0] === selection.id
+        ? [selection.id, group.id, ...startPins.slice(1)]
+        : [group.id, ...startPins]
+    }
+
     return {
-      columnVisibility: init.columnVisibility ?? visibility,
+      columnVisibility: restoredVisibility,
       columnPinning: restoredPinning,
       columnOrder: init.columnOrder ?? [],
       columnSizing: init.columnSizing ?? sizing,
@@ -246,6 +301,8 @@ export class ColumnModel {
   }
 
   private build(): TableInstance {
+    const group = this.groupDef()
+    if (group) this.defs.set(group.id, group)
     const selection = this.selectionDef()
     if (selection) this.defs.set(selection.id, selection)
     for (const def of this.orderedDefs) this.defs.set(def.id, this.mergedDef(def))
@@ -458,6 +515,10 @@ export class ColumnModel {
       sort: (s.sorting ?? []).map(x => ({ id: x.id, desc: x.desc })),
       filters,
       quickFilter: this.quickFilterValue,
+      // Renseignés par la grille : le groupage ne fait pas partie du modèle
+      // de colonnes de table-core.
+      rowGroup: [],
+      expandedGroups: [],
     }
   }
 
@@ -505,6 +566,17 @@ export class ColumnModel {
     const at = this.orderedDefs.findIndex(d => d.id === columnId)
     if (at === -1) return
     this.orderedDefs.splice(at, 1)
+    this.rebuild()
+  }
+
+  /**
+   * Change les colonnes de groupage : la colonne d'arborescence apparaît ou
+   * disparaît, et les colonnes groupées passent en masquées. Ces deux effets
+   * touchent la structure du modèle, d'où la reconstruction complète.
+   */
+  setGroupingColumns(columnIds: string[], groupColumn: { width: number } | false): void {
+    this.opts.groupedColumnIds = columnIds
+    this.opts.groupColumn = groupColumn
     this.rebuild()
   }
 
