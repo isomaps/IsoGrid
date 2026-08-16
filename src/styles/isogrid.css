@@ -1101,3 +1101,20 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 }
 
 .isg-cell[data-col-id="__isg_detail__"] { padding: 0; justify-content: center; }
+
+/* ==========================================================================
+   Colonne d'actions de ligne
+   ========================================================================== */
+
+.isg-cell[data-col-id="__isg_actions__"] { padding: 0; justify-content: center; }
+
+/* Toujours visible, comme le filtre d'en-tête : un bouton d'action masqué
+   hors survol reste introuvable, et c'est le seul point d'entrée vers ce
+   qu'on peut faire d'une ligne. */
+.isg-row-actions-btn {
+  opacity: .5;
+  transition: opacity .12s ease;
+  font-size: 13px;
+}
+.isg-row:hover .isg-row-actions-btn,
+.isg-row-actions-btn:focus-visible { opacity: 1; }

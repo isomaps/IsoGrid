@@ -23,7 +23,7 @@ export { builtinIconRenderer, fontAwesomeIconRenderer } from './ui/icons'
 export { ContextMenu, writeToClipboard } from './ui/context-menu'
 export { SELECTION_COLUMN_ID, SelectionModel } from './core/selection'
 export { GROUP_COLUMN_ID, GroupingModel } from './core/grouping'
-export { DETAIL_COLUMN_ID, DetailLayout, DetailModel } from './core/detail'
+export { DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID, DetailLayout, DetailModel } from './core/detail'
 export type { ContextMenuContext, ContextMenuItem, ContextMenuOptions } from './ui/context-menu'
 
 export {

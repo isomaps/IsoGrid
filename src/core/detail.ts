@@ -17,6 +17,9 @@ import type { AnyRow } from './types'
 
 export const DETAIL_COLUMN_ID = '__isg_detail__'
 
+/** Colonne d'actions de ligne, épinglée à droite. */
+export const ROW_ACTIONS_COLUMN_ID = '__isg_actions__'
+
 export interface DetailContext<TRow = AnyRow> {
   row: TRow
   rowIndex: number

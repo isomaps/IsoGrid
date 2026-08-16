@@ -174,6 +174,30 @@ Clair/sombre automatique (`prefers-color-scheme`), forçable via
 81 clés chacune. Une clé absente d'une langue est un bug, pas un « à
 compléter ». `messages` permet de surcharger n'importe quel libellé.
 
+## Actions de ligne
+
+```ts
+new IsoGrid(el, {
+  rowActions: {
+    items: (row) => [
+      { label: 'Voir',     icon: 'eye',  action: () => location.assign(`/users/${row.id}`) },
+      { label: 'Modifier', icon: 'grip', action: () => modifier(row) },
+      { separator: true },
+      { label: 'Supprimer', icon: 'close', disabled: !row.deletable, action: () => supprimer(row) },
+    ],
+  },
+})
+```
+
+Une colonne « ⋮ » apparaît, épinglée à droite. Le menu s'ancre sous le bouton,
+se ferme au clic extérieur et à Échap, et prend le focus au clavier. Retourner
+un tableau vide masque le bouton : une ligne sans action possible n'affiche
+pas de bouton mort.
+
+Sans cela, une grille n'est qu'une consultation — c'est ce qui manque pour
+remplacer une table d'administration, où chaque ligne s'ouvre, se modifie ou
+déclenche un traitement.
+
 ## Lignes de détail (master-detail)
 
 ```ts

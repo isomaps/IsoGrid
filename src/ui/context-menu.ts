@@ -94,6 +94,43 @@ export class ContextMenu {
     this.element = undefined
   }
 
+  /**
+   * Ouvre un menu d'items arbitraires à une position donnée.
+   *
+   * Séparé de `open()` pour que la colonne d'actions réutilise exactement le
+   * même flottant : positionnement rabattu dans la fenêtre, fermeture au clic
+   * extérieur et à Échap, focus au clavier.
+   */
+  openItems(items: ContextMenuItem[], x: number, y: number): void {
+    this.close()
+    if (items.length === 0) return
+
+    const menu = el('div', { class: `${NS}-popover ${NS}-menu ${NS}-context-menu`, attrs: { role: 'menu' } })
+    for (const item of items) {
+      if (item.separator) {
+        menu.append(el('div', { class: `${NS}-menu-sep` }))
+        continue
+      }
+      menu.append(el('button', {
+        class: `${NS}-menu-item`,
+        attrs: { type: 'button', role: 'menuitem', disabled: item.disabled },
+        children: [
+          item.icon ? this.ctx.icon(item.icon) : el('span', { class: `${NS}-icon` }),
+          el('span', { text: item.label ?? '' }),
+        ],
+        on: {
+          click: () => { this.close(); void item.action?.() },
+        },
+      }))
+    }
+
+    document.body.append(menu)
+    this.element = menu
+    this.positionAtPointer(menu, x, y)
+    this.dispose = onDismiss(menu, () => this.close())
+    menu.querySelector<HTMLElement>('button:not([disabled])')?.focus()
+  }
+
   open(event: MouseEvent, menuContext: ContextMenuContext): void {
     this.close()
     const t = this.ctx.t
@@ -137,34 +174,7 @@ export class ContextMenu {
 
     // On ne supprime le menu natif que si l'on a quelque chose à proposer.
     event.preventDefault()
-
-    const menu = el('div', { class: `${NS}-popover ${NS}-menu ${NS}-context-menu`, attrs: { role: 'menu' } })
-    for (const item of items) {
-      if (item.separator) {
-        menu.append(el('div', { class: `${NS}-menu-sep` }))
-        continue
-      }
-      menu.append(el('button', {
-        class: `${NS}-menu-item`,
-        attrs: { type: 'button', role: 'menuitem', disabled: item.disabled },
-        children: [
-          item.icon ? this.ctx.icon(item.icon) : el('span', { class: `${NS}-icon` }),
-          el('span', { text: item.label ?? '' }),
-        ],
-        on: {
-          click: () => {
-            this.close()
-            void item.action?.()
-          },
-        },
-      }))
-    }
-
-    document.body.append(menu)
-    this.element = menu
-    this.positionAtPointer(menu, event.clientX, event.clientY)
-    this.dispose = onDismiss(menu, () => this.close())
-    menu.querySelector<HTMLElement>('button:not([disabled])')?.focus()
+    this.openItems(items, event.clientX, event.clientY)
   }
 
   /** Ancre le menu au curseur, en le rabattant s'il déborde de la fenêtre. */

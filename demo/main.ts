@@ -97,6 +97,15 @@ function build(mode: 'server' | 'client') {
   onStateChange: (state) => localStorage.setItem(STATE_KEY, JSON.stringify(state)),
   export: { filename: 'factures', sheetName: 'Factures', source: 'all', maxRows: 100_000 },
   rowSelection: 'multiple',
+  rowActions: {
+    items: (row) => [
+      { label: `Ouvrir ${row.number}`, icon: 'eye' as const, action: () => console.debug('[demo] ouvrir', row.number) },
+      { label: 'Copier le n°', icon: 'copy' as const, action: () => navigator.clipboard?.writeText(String(row.number)) },
+      { separator: true },
+      { label: 'Annuler', icon: 'close' as const, disabled: row.status === 'annulée',
+        action: () => console.debug('[demo] annuler', row.number) },
+    ],
+  },
   getRowId: (row) => String(row.id),
   onSelectionChanged: (sel) => {
     const el = document.querySelector('#selection-readout')

@@ -10,6 +10,7 @@
 import type { SelectionSnapshot, SelectionState } from './selection'
 import type { AggFunc } from './grouping'
 import type { MasterDetailOptions } from './detail'
+import type { ContextMenuItem } from '../ui/context-menu'
 
 export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState } from './selection'
 export type { AggFunc, BuiltInAggFunc, DisplayRow, GroupNode } from './grouping'
@@ -413,6 +414,21 @@ export interface IsoGridOptions<TRow = AnyRow> {
    * chargé en réseau. Une colonne de chevron apparaît en tête.
    */
   masterDetail?: MasterDetailOptions<TRow>
+
+  /**
+   * Actions de ligne, regroupées derrière un bouton « ⋮ » dans une colonne
+   * épinglée à droite.
+   *
+   * Une grille sans actions n'est qu'une consultation : c'est ce qui manque
+   * pour remplacer une table d'administration, où chaque ligne se modifie,
+   * s'ouvre ou déclenche un traitement.
+   */
+  rowActions?: {
+    /** Largeur de la colonne. Défaut : 48. */
+    width?: number
+    /** Construit le menu pour une ligne. Retourner `[]` masque le bouton. */
+    items: (row: TRow, rowIndex: number) => ContextMenuItem[]
+  }
 
   sidebar?: false | SidebarOptions
   toolbar?: false | ToolbarOptions

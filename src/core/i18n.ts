@@ -16,6 +16,7 @@ export type MessageKey =
   | 'and' | 'or' | 'addCondition' | 'removeCondition'
   | 'selectAll' | 'deselectAll' | 'noValues' | 'searchValues' | 'blankValue'
   | 'selectRow' | 'selectAllRows' | 'clearSelection' | 'allRowsSelected'
+  | 'rowActions'
   | 'groupBy' | 'ungroup' | 'expandGroup' | 'collapseGroup'
   | 'expandAllGroups' | 'collapseAllGroups' | 'groupPanelEmpty' | 'grouped'
   | 'copyCell' | 'copyRow' | 'copyRowWithHeaders' | 'copied' | 'copyFailed'
@@ -31,6 +32,7 @@ export type MessageKey =
 type Catalog = Record<MessageKey, string>
 
 const fr: Catalog = {
+  rowActions: 'Actions',
   groupBy: 'Grouper par cette colonne',
   ungroup: 'Retirer du groupage',
   expandGroup: 'Déplier le groupe',
@@ -123,6 +125,7 @@ const fr: Catalog = {
 }
 
 const en: Catalog = {
+  rowActions: 'Actions',
   groupBy: 'Group by this column',
   ungroup: 'Remove from grouping',
   expandGroup: 'Expand group',
@@ -215,6 +218,7 @@ const en: Catalog = {
 }
 
 const de: Catalog = {
+  rowActions: 'Aktionen',
   groupBy: 'Nach dieser Spalte gruppieren',
   ungroup: 'Aus der Gruppierung entfernen',
   expandGroup: 'Gruppe aufklappen',
@@ -307,6 +311,7 @@ const de: Catalog = {
 }
 
 const es: Catalog = {
+  rowActions: 'Acciones',
   groupBy: 'Agrupar por esta columna',
   ungroup: 'Quitar de la agrupación',
   expandGroup: 'Desplegar el grupo',
@@ -399,6 +404,7 @@ const es: Catalog = {
 }
 
 const it: Catalog = {
+  rowActions: 'Azioni',
   groupBy: 'Raggruppa per questa colonna',
   ungroup: 'Rimuovi dal raggruppamento',
   expandGroup: 'Espandi il gruppo',
@@ -491,6 +497,7 @@ const it: Catalog = {
 }
 
 const nl: Catalog = {
+  rowActions: 'Acties',
   groupBy: 'Groeperen op deze kolom',
   ungroup: 'Uit groepering verwijderen',
   expandGroup: 'Groep uitvouwen',
@@ -583,6 +590,7 @@ const nl: Catalog = {
 }
 
 const pl: Catalog = {
+  rowActions: 'Akcje',
   groupBy: 'Grupuj według tej kolumny',
   ungroup: 'Usuń z grupowania',
   expandGroup: 'Rozwiń grupę',
@@ -675,6 +683,7 @@ const pl: Catalog = {
 }
 
 const ru: Catalog = {
+  rowActions: 'Действия',
   groupBy: 'Группировать по этому столбцу',
   ungroup: 'Убрать из группировки',
   expandGroup: 'Развернуть группу',

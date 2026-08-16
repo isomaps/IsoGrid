@@ -15,7 +15,7 @@ import { batch, createAtom } from '@tanstack/store'
 import type { AnyRow, ColumnDef, GridState, PinPosition, SortModel } from './types'
 import { SELECTION_COLUMN_ID } from './selection'
 import { GROUP_COLUMN_ID } from './grouping'
-import { DETAIL_COLUMN_ID } from './detail'
+import { DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID } from './detail'
 
 /**
  * Câblage de @tanstack/table-core.
@@ -72,6 +72,8 @@ export interface ColumnModelOptions {
   groupColumn?: { width: number } | false
   /** Ajoute la colonne de chevron des lignes de détail. */
   detailColumn?: { width: number } | false
+  /** Ajoute la colonne d'actions de ligne, épinglée à droite. */
+  actionsColumn?: { width: number } | false
   /** Colonnes servant au groupage : masquées puisque leur valeur est portée par le groupe. */
   groupedColumnIds?: string[]
   defaultColumn?: Partial<ColumnDef>
@@ -129,6 +131,27 @@ export class ColumnModel {
 
   private mergedDef(def: ColumnDef): ColumnDef {
     return { ...this.opts.defaultColumn, ...def }
+  }
+
+  /** Définition synthétique de la colonne d'actions. */
+  private actionsDef(): ColumnDef | null {
+    const cfg = this.opts.actionsColumn
+    if (!cfg) return null
+    return {
+      id: ROW_ACTIONS_COLUMN_ID,
+      header: '',
+      width: cfg.width,
+      minWidth: cfg.width,
+      maxWidth: cfg.width,
+      pinned: 'end',
+      sortable: false,
+      resizable: false,
+      filter: false,
+      lockVisible: true,
+      lockPosition: true,
+      align: 'center',
+      excludeFromExport: true,
+    }
   }
 
   /** Définition synthétique de la colonne de chevron du détail. */
@@ -201,6 +224,8 @@ export class ColumnModel {
     const out: unknown[] = []
     let currentGroup: string | null = null
     let bucket: unknown[] | null = null
+
+    const actions = this.actionsDef()
 
     const detail = this.detailDef()
     if (detail) {
@@ -282,6 +307,22 @@ export class ColumnModel {
         out.push(leaf)
       }
     }
+
+    if (actions) {
+      out.push({
+        id: actions.id,
+        accessorKey: actions.id,
+        header: '',
+        size: actions.width,
+        minSize: actions.minWidth,
+        maxSize: actions.maxWidth,
+        enableSorting: false,
+        enableResizing: false,
+        enableHiding: false,
+        enablePinning: true,
+        filterFn: 'delegated' as const,
+      })
+    }
     return out
   }
 
@@ -299,6 +340,8 @@ export class ColumnModel {
     if (group) pinStart.push(group.id)
     const detail = this.detailDef()
     if (detail) pinStart.push(detail.id)
+    const actions = this.actionsDef()
+    if (actions) pinEnd.push(actions.id)
 
     // Les indications portées par les colonnes forment la base…
     const grouped = new Set(this.opts.groupedColumnIds ?? [])
@@ -326,6 +369,10 @@ export class ColumnModel {
     const restoredVisibility = { ...(init.columnVisibility ?? visibility) }
     for (const id of grouped) restoredVisibility[id] = false
 
+    if (actions && !restoredPinning.end.includes(actions.id)) {
+      restoredPinning.end = [...restoredPinning.end, actions.id]
+    }
+
     if (detail && !restoredPinning.start.includes(detail.id)) {
       restoredPinning.start = [...restoredPinning.start, detail.id]
     }
@@ -348,6 +395,8 @@ export class ColumnModel {
   }
 
   private build(): TableInstance {
+    const actions = this.actionsDef()
+    if (actions) this.defs.set(actions.id, actions)
     const detail = this.detailDef()
     if (detail) this.defs.set(detail.id, detail)
     const group = this.groupDef()

@@ -9,7 +9,7 @@ import {
   type SelectionSnapshot, type SelectionState,
 } from '../core/selection'
 import { GROUP_COLUMN_ID, GroupingModel, type DisplayRow } from '../core/grouping'
-import { DETAIL_COLUMN_ID, DetailLayout, DetailModel } from '../core/detail'
+import { DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID, DetailLayout, DetailModel } from '../core/detail'
 import { Translator, resolveLocale } from '../core/i18n'
 import { BlockCache, createHttpDatasource } from '../datasource/server'
 import { ClientDatasource } from '../datasource/client'
@@ -35,6 +35,7 @@ const DEFAULTS = {
   groupColumnWidth: 240,
   detailColumnWidth: 40,
   detailProvisionalHeight: 120,
+  rowActionsWidth: 48,
   /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
   overscan: 6,
 } as const
@@ -69,6 +70,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private sidebar?: Sidebar
   private groupPanel?: GroupPanel
   private contextMenu?: ContextMenu
+  /** Menu des actions de ligne — instance dédiée, pour ne pas fermer le menu contextuel. */
+  private rowActionsMenu!: ContextMenu
 
   /* --- état de rendu --- */
   private renderedRows = new Map<number, HTMLElement>()
@@ -104,6 +107,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       detailColumn: options.masterDetail
         ? { width: options.masterDetail.columnWidth ?? DEFAULTS.detailColumnWidth }
         : false,
+      actionsColumn: options.rowActions
+        ? { width: options.rowActions.width ?? DEFAULTS.rowActionsWidth }
+        : false,
       defaultColumn: options.defaultColumn as Partial<ColumnDef>,
       defaultColumnWidth: options.defaultColumnWidth ?? DEFAULTS.defaultColumnWidth,
       initialState: options.initialState,
@@ -135,6 +141,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     }
 
     this.headerRenderer = new HeaderRenderer(this.ctx)
+    this.rowActionsMenu = new ContextMenu(this.ctx, {})
     if (options.contextMenu !== false) {
       this.contextMenu = new ContextMenu(this.ctx, (options.contextMenu ?? {}) as ContextMenuOptions)
     }
@@ -788,6 +795,15 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       return cell
     }
 
+    if (column.id === ROW_ACTIONS_COLUMN_ID) {
+      if (row) {
+        const items = this.options.rowActions!.items(row, rowIndex)
+        // Aucune action possible sur cette ligne : pas de bouton mort.
+        if (items.length > 0) cell.append(this.buildRowActionsButton(items))
+      }
+      return cell
+    }
+
     if (column.id === DETAIL_COLUMN_ID) {
       if (row && this.isMasterRow(row, rowIndex)) {
         cell.append(this.buildDetailToggle(row, rowIndex))
@@ -983,6 +999,29 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       return this.t.number(value, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     }
     return String(value ?? '')
+  }
+
+  /** Bouton « ⋮ » ouvrant le menu d'actions de la ligne. */
+  private buildRowActionsButton(items: import('./context-menu').ContextMenuItem[]): HTMLElement {
+    return el('button', {
+      class: `${NS}-icon-btn ${NS}-row-actions-btn`,
+      attrs: {
+        type: 'button',
+        'aria-haspopup': 'menu',
+        'aria-label': this.t.t('rowActions'),
+        title: this.t.t('rowActions'),
+      },
+      children: [renderIcon('menu', this.options.renderIcon)],
+      on: {
+        click: (e: MouseEvent) => {
+          e.stopPropagation()
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          // Ancré sous le bouton plutôt qu'au curseur : le menu doit s'ouvrir
+          // au même endroit qu'on clique à la souris ou au clavier.
+          this.rowActionsMenu.openItems(items, rect.left, rect.bottom + 2)
+        },
+      },
+    })
   }
 
   private buildRowCheckbox(row: TRow, rowIndex: number): HTMLElement {
@@ -1558,6 +1597,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.destroyed = true
     if (this.scrollFrame) cancelAnimationFrame(this.scrollFrame)
     this.contextMenu?.close()
+    this.rowActionsMenu?.close()
     this.detailObserver?.disconnect()
     this.resizeObserver?.disconnect()
     this.themeMediaQuery?.removeEventListener('change', this.onSystemTheme)
