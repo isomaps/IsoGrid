@@ -24,21 +24,8 @@ import { Toolbar } from './toolbar'
 import { GroupPanel } from './group-panel'
 import { ContextMenu, type ContextMenuOptions } from './context-menu'
 import { NS, el, getPath, renderIcon } from './dom'
+import { DEFAULTS } from '../core/defaults'
 
-const DEFAULTS = {
-  rowHeight: 36,
-  headerHeight: 48,
-  blockSize: 100,
-  maxBlocksInCache: 20,
-  defaultColumnWidth: 160,
-  selectionColumnWidth: 44,
-  groupColumnWidth: 240,
-  detailColumnWidth: 40,
-  detailProvisionalHeight: 120,
-  rowActionsWidth: 48,
-  /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
-  overscan: 6,
-} as const
 
 export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private options: IsoGridOptions<TRow>

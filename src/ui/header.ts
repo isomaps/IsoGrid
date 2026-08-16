@@ -3,6 +3,7 @@ import type { GridContext } from './context'
 import { NS, el, onDismiss, positionFloating } from './dom'
 import { openFilterPopover } from '../filters/widgets'
 import { resolveFilterConfig } from '../filters/model'
+import { DEFAULTS } from '../core/defaults'
 import { SELECTION_COLUMN_ID } from '../core/selection'
 import { GROUP_COLUMN_ID } from '../core/grouping'
 
@@ -21,7 +22,7 @@ export class HeaderRenderer {
   render(): void {
     this.element.replaceChildren()
     const rows = this.ctx.columns.getHeaderRows()
-    const headerHeight = this.ctx.options.headerHeight ?? 40
+    const headerHeight = this.ctx.options.headerHeight ?? DEFAULTS.headerHeight
 
     rows.forEach((headers, rowIndex) => {
       const isLeafRow = rowIndex === rows.length - 1
