@@ -24,6 +24,21 @@
     'options' => [],
 ])
 
+@php
+    /**
+     * Empreinte du bundle, pour casser le cache du navigateur.
+     *
+     * Sans elle, un navigateur qui a déjà chargé `isogrid.js` continue de
+     * l'exécuter après une mise à jour : le fichier est servi en statique,
+     * sans hachage dans son nom. Le symptôme est trompeur — les anciennes
+     * fonctions marchent, les nouvelles semblent absentes.
+     *
+     * `filemtime` plutôt que le numéro de version : il change dès que le
+     * fichier change, y compris entre deux builds d'une même version.
+     */
+    $isogridV = @filemtime(public_path('vendor/isogrid/isogrid.js')) ?: 'dev';
+@endphp
+
 @once
     {{-- Bundle autonome (TanStack inclus) servi en statique : il ne passe pas
          par Vite, donc aucune dépendance npm à installer côté hôte.
@@ -32,7 +47,7 @@
          pointant sur un CDN (c'est le cas de Web/www en production), `asset()`
          renvoie une URL CDN — or le CDN ne reçoit que `public/build/`, pas
          `public/vendor/`. On obtenait donc trois 404 et une grille muette. --}}
-    <link rel="stylesheet" href="{{ url('/vendor/isogrid/isogrid.css') }}">
+    <link rel="stylesheet" href="{{ url('/vendor/isogrid/isogrid.css') }}?v={{ $isogridV }}">
 
     {{-- Volontairement inline et AVANT le conteneur, pas dans @push('scripts') :
          un panneau Filament n'expose pas forcément cette pile. Un script
@@ -40,7 +55,7 @@
          mais AVANT `DOMContentLoaded` — c'est-à-dire avant qu'Alpine ne démarre
          et ne rencontre le `x-data` ci-dessous. --}}
     <script type="module">
-        import { autoRegisterIsoGridAlpine } from '{{ url('/vendor/isogrid/isogrid.js') }}';
+        import { autoRegisterIsoGridAlpine } from '{{ url('/vendor/isogrid/isogrid.js') }}?v={{ $isogridV }}';
         autoRegisterIsoGridAlpine();
     </script>
 @endonce
@@ -54,7 +69,7 @@
         'source' => $source,
         'persistKey' => $persistKey,
         'locale' => $locale ?? app()->getLocale(),
-        'excelJsUrl' => url('/vendor/isogrid/exceljs.js'),
+        'excelJsUrl' => url('/vendor/isogrid/exceljs.js').'?v='.$isogridV,
     ], $options)))"
     x-init="mount()"
     style="height: {{ $height }}"

@@ -460,6 +460,12 @@ réellement changé.
 bibliothèque : c'est ce qui rend cette copie tenable dans le temps, et ça
 s'accroche à une CI.
 
+Le composant Blade ajoute une empreinte (`?v=…`, le `filemtime` du bundle) aux
+trois URLs. **Sans elle, un navigateur qui a déjà chargé `isogrid.js` continue
+de l'exécuter après une mise à jour** : le fichier est servi en statique, sans
+hachage dans son nom. Le symptôme est trompeur — les anciennes fonctions
+marchent, les nouvelles semblent absentes.
+
 > **Pourquoi une copie et pas `composer require` / `npm i`.** Les déploiements
 > du workspace IsoMaps ne lancent **ni `composer install` ni `npm install`**, et
 > `vendor/` n'est pas versionné. Un paquet exigerait donc une intervention

@@ -1,6 +1,6 @@
 {
   "name": "@isomaps/isogrid",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Grille de données headless-based, framework-agnostique : colonnes épinglées, filtres par colonne, sidebar, export Excel, modèle de lignes client ou serveur.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
