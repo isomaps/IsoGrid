@@ -21,6 +21,9 @@
   /* Traits */
   --isg-border: #e2e8f0;
   --isg-border-strong: #cbd5e1;
+  /* Filets horizontaux de l'en-tête : un cran plus marqué que ceux du corps,
+     pour détacher l'en-tête sans l'alourdir d'un aplat. */
+  --isg-border-header: #dcdddd;
 
   /* Accent */
   --isg-accent: #2563eb;
@@ -80,6 +83,7 @@
   --isg-fg-header: #cbd5e1;
   --isg-border: #1e293b;
   --isg-border-strong: #334155;
+  --isg-border-header: #334155;
   --isg-accent: #60a5fa;
   --isg-accent-fg: #0f172a;
   --isg-accent-soft: #1e3a5f;
@@ -102,6 +106,7 @@
     --isg-fg-header: #cbd5e1;
     --isg-border: #1e293b;
     --isg-border-strong: #334155;
+    --isg-border-header: #334155;
     --isg-accent: #60a5fa;
     --isg-accent-fg: #0f172a;
     --isg-accent-soft: #1e3a5f;
@@ -234,9 +239,12 @@ svg.isg-icon { font-size: 1.05em; }
 .isg-header-row {
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--isg-border);
+  border-top: 1px solid var(--isg-border-header);
+  border-bottom: 1px solid var(--isg-border-header);
   background: var(--isg-bg-header);
 }
+/* Deux lignes d'en-tête (groupes + colonnes) ne doivent pas doubler le filet. */
+.isg-header-row + .isg-header-row { border-top: none; }
 .isg-header-row-group .isg-hcell { font-weight: 600; justify-content: center; }
 
 /* Fond identique au corps et pas de bordure pleine : la colonne est marquée
@@ -631,6 +639,9 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   --isg-fg-muted: #64748b;
   --isg-border: #e2e8f0;
   --isg-border-strong: #cbd5e1;
+  /* Filets horizontaux de l'en-tête : un cran plus marqué que ceux du corps,
+     pour détacher l'en-tête sans l'alourdir d'un aplat. */
+  --isg-border-header: #dcdddd;
   --isg-accent: #2563eb;
   --isg-accent-soft: #dbeafe;
   --isg-danger: #dc2626;
