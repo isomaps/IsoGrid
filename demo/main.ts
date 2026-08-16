@@ -62,6 +62,34 @@ function build(mode: 'server' | 'client') {
   // qu'en mode client.
   groupPanel: mode === 'client' ? (true as const) : undefined,
   groupDefaultExpanded: 0,
+  // Reproduit le cas réel le plus exigeant : contenu chargé en réseau, donc
+  // de hauteur inconnue au montage et variable ensuite.
+  masterDetail: {
+    height: 'auto' as const,
+    isRowMaster: (row) => Number(row.total) > 0,
+    renderer: ({ row, invalidateHeight }) => {
+      const box = document.createElement('div')
+      box.style.cssText = 'padding:14px 18px;font-size:13px'
+      box.innerHTML = '<em style="color:#64748b">Chargement du détail…</em>'
+      // Latence et taille de contenu variables, comme un vrai appel réseau.
+      const lignes = 1 + (Number(row.id) % 4)
+      setTimeout(() => {
+        box.innerHTML =
+          `<div style="font-weight:600;margin-bottom:8px">Facture ${row.number}</div>` +
+          Array.from({ length: lignes }, (_, i) =>
+            `<div style="display:flex;gap:16px;padding:3px 0;border-top:1px solid #e2e8f0">
+               <span style="width:150px;color:#64748b">Poste ${i + 1}</span>
+               <span>${row.client}</span>
+               <span style="margin-left:auto;font-variant-numeric:tabular-nums">
+                 ${(Number(row.amountHt) / lignes).toFixed(2)}</span>
+             </div>`).join('')
+        // L'observateur de taille suffit dans un navigateur, mais le prévenir
+        // explicitement est la voie fiable : elle ne dépend d'aucune API.
+        invalidateHeight()
+      }, 250 + (Number(row.id) % 3) * 200)
+      return box
+    },
+  },
   locale: 'fr',
   theme: 'auto',
   blockSize: 100,

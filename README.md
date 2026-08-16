@@ -174,6 +174,60 @@ Clair/sombre automatique (`prefers-color-scheme`), forçable via
 81 clés chacune. Une clé absente d'une langue est un bug, pas un « à
 compléter ». `messages` permet de surcharger n'importe quel libellé.
 
+## Lignes de détail (master-detail)
+
+```ts
+new IsoGrid(el, {
+  masterDetail: {
+    height: 'auto',                          // défaut : mesure le contenu réel
+    isRowMaster: (row) => row.hasLines,      // défaut : toutes les lignes
+    renderer: ({ row, invalidateHeight }) => {
+      const box = document.createElement('div')
+      box.textContent = 'Chargement…'
+      fetch(`/factures/${row.id}/lignes`)
+        .then(r => r.json())
+        .then(data => { box.innerHTML = rendu(data); invalidateHeight() })
+      return box
+    },
+  },
+})
+```
+
+Une colonne de chevron apparaît en tête. Le panneau se place **sous** sa ligne
+maître, occupe toute la largeur et ne défile pas horizontalement — c'est une
+fiche, pas une continuation du tableau.
+
+**Fonctionne en mode client comme en mode serveur** : contrairement au
+groupage, le détail n'a besoin que de la ligne concernée.
+
+### Hauteur automatique
+
+C'est le point délicat. Le contenu vient souvent du réseau : sa hauteur est
+inconnue au montage et change quand la réponse arrive. Trois mécanismes se
+complètent :
+
+1. **Mesure synchrone** juste après l'insertion — un contenu déjà complet est
+   au bon format dès le premier rendu, sans passer par une hauteur provisoire.
+2. **`ResizeObserver`** sur le panneau — suit les changements ultérieurs sans
+   rien demander à l'hôte.
+3. **`invalidateHeight()`**, fourni au renderer — la voie explicite, qui ne
+   dépend d'aucune API. À appeler dès que le contenu a fini de changer.
+
+Passer `height: 240` fige la hauteur et court-circuite tout ça.
+
+> **Sous le capot.** La virtualisation suppose des lignes de hauteur égale
+> (`offset = index × hauteur`). Un panneau la rompt. `DetailLayout` ne stocke
+> que les exceptions — les quelques lignes dépliées — et recalcule les
+> décalages à partir d'elles. Un panneau **s'ajoute** sous sa ligne, il ne la
+> remplace pas : le traiter comme une hauteur substituée ferait chevaucher la
+> ligne suivante.
+
+```ts
+grid.toggleDetail(rowId) / isDetailOpen(rowId) / closeAllDetails()
+```
+
+L'état (`openDetails`) fait partie de `GridState`.
+
 ## Groupage de lignes
 
 ```ts

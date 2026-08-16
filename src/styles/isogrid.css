@@ -1049,3 +1049,55 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 }
 
 .isg-cell-agg { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Lignes de détail (master-detail)
+   ========================================================================== */
+
+.isg-detail {
+  position: absolute;
+  top: 0;
+  /* Le panneau colle au bord gauche du viewport et NE défile PAS
+     horizontalement : son contenu est une fiche, pas une continuation du
+     tableau — le faire défiler avec les colonnes le rendrait illisible. */
+  left: 0;
+  width: 100%;
+  background: var(--isg-bg-alt);
+  border-bottom: 1px solid var(--isg-border);
+  overflow: hidden;
+  z-index: 1;
+}
+
+.isg-detail-inner {
+  position: sticky;
+  left: 0;
+  /* Reprend la largeur du viewport, pas celle du corps : le panneau reste
+     entièrement visible quel que soit le défilement horizontal. */
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+.isg-detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--isg-radius-sm);
+  background: transparent;
+  color: var(--isg-fg-muted);
+  cursor: pointer;
+  font-size: 10px;
+}
+.isg-detail-toggle:hover { background: var(--isg-border); color: var(--isg-fg); }
+.isg-detail-toggle .isg-icon { transition: transform .14s ease; }
+.isg-detail-toggle.isg-open .isg-icon { transform: rotate(90deg); }
+.isg-detail-toggle.isg-open { color: var(--isg-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .isg-detail-toggle .isg-icon { transition: none; }
+}
+
+.isg-cell[data-col-id="__isg_detail__"] { padding: 0; justify-content: center; }

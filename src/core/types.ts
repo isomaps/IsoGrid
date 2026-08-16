@@ -9,9 +9,11 @@
 
 import type { SelectionSnapshot, SelectionState } from './selection'
 import type { AggFunc } from './grouping'
+import type { MasterDetailOptions } from './detail'
 
 export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState } from './selection'
 export type { AggFunc, BuiltInAggFunc, DisplayRow, GroupNode } from './grouping'
+export type { DetailContext, MasterDetailOptions } from './detail'
 
 /* ------------------------------------------------------------------------ */
 /* Colonnes                                                                  */
@@ -211,6 +213,8 @@ export interface GridState {
   rowGroup: string[]
   /** Chemins des groupes dépliés. */
   expandedGroups: string[]
+  /** Identifiants des lignes dont le détail est ouvert. */
+  openDetails: string[]
 }
 
 /* ------------------------------------------------------------------------ */
@@ -404,6 +408,12 @@ export interface IsoGridOptions<TRow = AnyRow> {
   /** Appelé quand les colonnes de groupage changent. */
   onRowGroupChanged?: (columnIds: string[], grid: IsoGridApi<TRow>) => void
 
+  /**
+   * Lignes dépliables sur un panneau de détail : sous-grille, fiche, contenu
+   * chargé en réseau. Une colonne de chevron apparaît en tête.
+   */
+  masterDetail?: MasterDetailOptions<TRow>
+
   sidebar?: false | SidebarOptions
   toolbar?: false | ToolbarOptions
   /**
@@ -526,6 +536,11 @@ export interface IsoGridApi<TRow = AnyRow> {
   removeRowGroup(columnId: string): void
   expandAllGroups(): void
   collapseAllGroups(): void
+
+  /* --- détail --- */
+  toggleDetail(rowId: string): void
+  isDetailOpen(rowId: string): boolean
+  closeAllDetails(): void
 
   /* --- divers --- */
   setLocale(locale: LocaleCode): void

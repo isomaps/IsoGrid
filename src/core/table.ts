@@ -15,6 +15,7 @@ import { batch, createAtom } from '@tanstack/store'
 import type { AnyRow, ColumnDef, GridState, PinPosition, SortModel } from './types'
 import { SELECTION_COLUMN_ID } from './selection'
 import { GROUP_COLUMN_ID } from './grouping'
+import { DETAIL_COLUMN_ID } from './detail'
 
 /**
  * Câblage de @tanstack/table-core.
@@ -69,6 +70,8 @@ export interface ColumnModelOptions {
   selectionColumn?: { width: number } | false
   /** Ajoute la colonne d'arborescence des groupes. */
   groupColumn?: { width: number } | false
+  /** Ajoute la colonne de chevron des lignes de détail. */
+  detailColumn?: { width: number } | false
   /** Colonnes servant au groupage : masquées puisque leur valeur est portée par le groupe. */
   groupedColumnIds?: string[]
   defaultColumn?: Partial<ColumnDef>
@@ -128,6 +131,27 @@ export class ColumnModel {
     return { ...this.opts.defaultColumn, ...def }
   }
 
+  /** Définition synthétique de la colonne de chevron du détail. */
+  private detailDef(): ColumnDef | null {
+    const cfg = this.opts.detailColumn
+    if (!cfg) return null
+    return {
+      id: DETAIL_COLUMN_ID,
+      header: '',
+      width: cfg.width,
+      minWidth: cfg.width,
+      maxWidth: cfg.width,
+      pinned: 'start',
+      sortable: false,
+      resizable: false,
+      filter: false,
+      lockVisible: true,
+      lockPosition: true,
+      align: 'center',
+      excludeFromExport: true,
+    }
+  }
+
   /** Définition synthétique de la colonne de groupe. */
   private groupDef(): ColumnDef | null {
     const cfg = this.opts.groupColumn
@@ -177,6 +201,23 @@ export class ColumnModel {
     const out: unknown[] = []
     let currentGroup: string | null = null
     let bucket: unknown[] | null = null
+
+    const detail = this.detailDef()
+    if (detail) {
+      out.push({
+        id: detail.id,
+        accessorKey: detail.id,
+        header: '',
+        size: detail.width,
+        minSize: detail.minWidth,
+        maxSize: detail.maxWidth,
+        enableSorting: false,
+        enableResizing: false,
+        enableHiding: false,
+        enablePinning: true,
+        filterFn: 'delegated' as const,
+      })
+    }
 
     const group = this.groupDef()
     if (group) {
@@ -256,6 +297,8 @@ export class ColumnModel {
     if (selection) pinStart.push(selection.id)
     const group = this.groupDef()
     if (group) pinStart.push(group.id)
+    const detail = this.detailDef()
+    if (detail) pinStart.push(detail.id)
 
     // Les indications portées par les colonnes forment la base…
     const grouped = new Set(this.opts.groupedColumnIds ?? [])
@@ -283,6 +326,10 @@ export class ColumnModel {
     const restoredVisibility = { ...(init.columnVisibility ?? visibility) }
     for (const id of grouped) restoredVisibility[id] = false
 
+    if (detail && !restoredPinning.start.includes(detail.id)) {
+      restoredPinning.start = [...restoredPinning.start, detail.id]
+    }
+
     const startPins = restoredPinning.start
     if (group && !startPins.includes(group.id)) {
       restoredPinning.start = selection && startPins[0] === selection.id
@@ -301,6 +348,8 @@ export class ColumnModel {
   }
 
   private build(): TableInstance {
+    const detail = this.detailDef()
+    if (detail) this.defs.set(detail.id, detail)
     const group = this.groupDef()
     if (group) this.defs.set(group.id, group)
     const selection = this.selectionDef()
@@ -515,10 +564,11 @@ export class ColumnModel {
       sort: (s.sorting ?? []).map(x => ({ id: x.id, desc: x.desc })),
       filters,
       quickFilter: this.quickFilterValue,
-      // Renseignés par la grille : le groupage ne fait pas partie du modèle
-      // de colonnes de table-core.
+      // Renseignés par la grille : ni le groupage ni le détail ne font partie
+      // du modèle de colonnes de table-core.
       rowGroup: [],
       expandedGroups: [],
+      openDetails: [],
     }
   }
 

@@ -9,6 +9,7 @@ import {
   type SelectionSnapshot, type SelectionState,
 } from '../core/selection'
 import { GROUP_COLUMN_ID, GroupingModel, type DisplayRow } from '../core/grouping'
+import { DETAIL_COLUMN_ID, DetailLayout, DetailModel } from '../core/detail'
 import { Translator, resolveLocale } from '../core/i18n'
 import { BlockCache, createHttpDatasource } from '../datasource/server'
 import { ClientDatasource } from '../datasource/client'
@@ -32,6 +33,8 @@ const DEFAULTS = {
   defaultColumnWidth: 160,
   selectionColumnWidth: 44,
   groupColumnWidth: 240,
+  detailColumnWidth: 40,
+  detailProvisionalHeight: 120,
   /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
   overscan: 6,
 } as const
@@ -44,6 +47,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private clientSource?: ClientDatasource<TRow>
   private selection: SelectionModel
   private grouping: GroupingModel<TRow>
+  private details = new DetailModel()
+  private detailLayout: DetailLayout
+  /** Panneaux de détail montés, par index d'affichage. */
+  private detailNodes = new Map<number, HTMLElement>()
+  /** Hauteurs mesurées des panneaux, par identifiant de ligne. */
+  private measuredHeights = new Map<string, number>()
+  private detailObserver?: ResizeObserver
   /** Dernière ligne cochée, pour la sélection de plage au Maj-clic. */
   private lastSelectedIndex: number | null = null
   private ctx: GridContext
@@ -77,6 +87,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     this.selection = new SelectionModel(() => this.onSelectionChange())
     this.grouping = new GroupingModel<TRow>({ defaultExpanded: options.groupDefaultExpanded })
+    this.detailLayout = new DetailLayout(options.rowHeight ?? DEFAULTS.rowHeight)
 
     const initialGroups = options.initialState?.rowGroup ?? options.rowGroup ?? []
     if (initialGroups.length > 0) this.grouping.setGroupBy(initialGroups)
@@ -90,6 +101,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         ? { width: options.groupColumnWidth ?? DEFAULTS.groupColumnWidth }
         : false,
       groupedColumnIds: this.grouping.getGroupBy(),
+      detailColumn: options.masterDetail
+        ? { width: options.masterDetail.columnWidth ?? DEFAULTS.detailColumnWidth }
+        : false,
       defaultColumn: options.defaultColumn as Partial<ColumnDef>,
       defaultColumnWidth: options.defaultColumnWidth ?? DEFAULTS.defaultColumnWidth,
       initialState: options.initialState,
@@ -207,6 +221,149 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       this.resizeObserver.observe(this.viewport)
     }
     return root
+  }
+
+  /* -------------------------------------------------------------------- */
+  /* Lignes de détail                                                      */
+  /* -------------------------------------------------------------------- */
+
+  private isMasterRow(row: TRow, index: number): boolean {
+    const md = this.options.masterDetail
+    if (!md) return false
+    return md.isRowMaster ? md.isRowMaster(row, index) : true
+  }
+
+  private isDetailOpenAt(index: number, row: TRow | undefined): boolean {
+    if (!this.options.masterDetail || !row) return false
+    return this.details.isOpen(this.rowId(row, index))
+  }
+
+  /**
+   * Répercute l'état d'ouverture sur la couche de décalages.
+   *
+   * Les index d'affichage changent à chaque tri, filtre ou dépliage de groupe,
+   * alors que l'ouverture est mémorisée par identifiant de ligne : il faut
+   * donc les recalculer à chaque rendu, et non les mémoriser.
+   */
+  private syncDetailLayout(): void {
+    this.detailLayout.reset()
+    if (!this.options.masterDetail) return
+    if (this.details.getOpen().length === 0) return
+
+    const total = this.totalRowCount()
+    const provisional = this.options.masterDetail.provisionalHeight
+      ?? DEFAULTS.detailProvisionalHeight
+
+    for (let i = 0; i < total; i++) {
+      const display = this.displayRow(i)
+      if (display?.kind !== 'leaf') continue
+      if (!this.details.isOpen(this.rowId(display.row, i))) continue
+      const measured = this.measuredHeights.get(this.rowId(display.row, i))
+      this.detailLayout.set(i, measured ?? provisional)
+    }
+  }
+
+  private mountDetailPanel(index: number, row: TRow, rowHeight: number): HTMLElement {
+    const md = this.options.masterDetail!
+    const rowId = this.rowId(row, index)
+
+    const panel = el('div', {
+      class: `${NS}-detail`,
+      attrs: { role: 'row', 'data-detail-for': rowId },
+      style: {
+        // Le panneau démarre juste sous sa ligne maître.
+        transform: `translateY(${this.detailLayout.offsetOf(index) + rowHeight}px)`,
+      },
+    })
+
+    const inner = el('div', { class: `${NS}-detail-inner` })
+    const content = md.renderer({
+      row,
+      rowIndex: index,
+      invalidateHeight: () => this.remeasureDetail(rowId, inner),
+    })
+    if (typeof content === 'string') inner.innerHTML = content
+    else inner.append(content)
+    panel.append(inner)
+
+    if ((md.height ?? 'auto') === 'auto') {
+      // Deux mesures, pour deux moments distincts.
+      //
+      // 1. Tout de suite après l'insertion : un contenu déjà complet est
+      //    mesuré au bon format dès le premier rendu, sans passer par une
+      //    hauteur provisoire fausse pendant une frame.
+      // 2. Ensuite, en continu : le contenu arrive souvent du réseau et
+      //    change de taille après coup, ce que seule l'observation détecte.
+      queueMicrotask(() => {
+        if (this.destroyed || !inner.isConnected) return
+        this.remeasureDetail(rowId, inner)
+      })
+      this.ensureDetailObserver()
+      this.detailObserver?.observe(inner)
+    } else {
+      panel.style.height = `${md.height as number}px`
+      this.measuredHeights.set(rowId, md.height as number)
+    }
+
+    this.detailNodes.set(index, panel)
+    return panel
+  }
+
+  private ensureDetailObserver(): void {
+    if (this.detailObserver || typeof ResizeObserver === 'undefined') return
+    this.detailObserver = new ResizeObserver((entries) => {
+      if (this.destroyed) return
+      let changed = false
+      for (const entry of entries) {
+        const panel = (entry.target as HTMLElement).closest(`.${NS}-detail`) as HTMLElement | null
+        const rowId = panel?.dataset.detailFor
+        if (!rowId) continue
+        const height = Math.ceil(entry.contentRect.height)
+        if (height <= 0 || this.measuredHeights.get(rowId) === height) continue
+        this.measuredHeights.set(rowId, height)
+        changed = true
+      }
+      // Une seule relance de mise en page pour tout le lot : relancer par
+      // panneau provoquerait autant de reflows.
+      if (changed) this.relayoutDetails()
+    })
+  }
+
+  private remeasureDetail(rowId: string, inner: HTMLElement): void {
+    const height = Math.ceil(inner.getBoundingClientRect().height)
+    if (height <= 0 || this.measuredHeights.get(rowId) === height) return
+    this.measuredHeights.set(rowId, height)
+    this.relayoutDetails()
+  }
+
+  /** Repositionne tout sans reconstruire : seules les hauteurs ont bougé. */
+  private relayoutDetails(): void {
+    const rowHeight = this.rowHeight()
+    this.syncDetailLayout()
+    this.bodyEl.style.height = `${this.detailLayout.totalHeight(this.totalRowCount())}px`
+    for (const [index, node] of this.renderedRows) {
+      node.style.transform = `translateY(${this.detailLayout.offsetOf(index)}px)`
+    }
+    for (const [index, panel] of this.detailNodes) {
+      panel.style.transform = `translateY(${this.detailLayout.offsetOf(index) + rowHeight}px)`
+    }
+  }
+
+  private buildDetailToggle(row: TRow, index: number): HTMLElement {
+    const rowId = this.rowId(row, index)
+    const open = this.details.isOpen(rowId)
+    return el('button', {
+      class: `${NS}-detail-toggle${open ? ` ${NS}-open` : ''}`,
+      attrs: {
+        type: 'button',
+        'aria-expanded': String(open),
+        'aria-label': this.t.t(open ? 'collapseGroup' : 'expandGroup'),
+      },
+      children: [renderIcon('chevron-right', this.options.renderIcon)],
+      on: {
+        click: (e: MouseEvent) => { e.stopPropagation(); this.toggleDetail(rowId) },
+      },
+    })
   }
 
   /* -------------------------------------------------------------------- */
@@ -453,14 +610,21 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return this.options.rowHeight ?? DEFAULTS.rowHeight
   }
 
-  /** Fenêtre de lignes à matérialiser, marge comprise. */
+  /**
+   * Fenêtre de lignes à matérialiser, marge comprise.
+   *
+   * Le passage par `DetailLayout` est ce qui permet aux panneaux de détail
+   * d'avoir leur propre hauteur : sans lui, `scrollTop / rowHeight` désignerait
+   * la mauvaise ligne dès qu'un panneau est ouvert au-dessus.
+   */
   private visibleRange(): { start: number; end: number } {
     const rowHeight = this.rowHeight()
     const scrollTop = this.viewport.scrollTop
     const height = this.viewport.clientHeight || 400
     const total = this.totalRowCount()
 
-    const first = Math.max(0, Math.floor(scrollTop / rowHeight) - DEFAULTS.overscan)
+    const at = this.detailLayout.indexAt(scrollTop, total)
+    const first = Math.max(0, at - DEFAULTS.overscan)
     const visibleCount = Math.ceil(height / rowHeight) + DEFAULTS.overscan * 2
     return { start: first, end: Math.min(total, first + visibleCount) }
   }
@@ -502,7 +666,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private renderBody(): void {
     const rowHeight = this.rowHeight()
     const total = this.totalRowCount()
-    this.bodyEl.style.height = `${total * rowHeight}px`
+    this.detailLayout.setRowHeight(rowHeight)
+    this.syncDetailLayout()
+    this.bodyEl.style.height = `${this.detailLayout.totalHeight(total)}px`
 
     const { start, end } = this.visibleRange()
 
@@ -511,6 +677,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (index < start || index >= end) {
         node.remove()
         this.renderedRows.delete(index)
+        const panel = this.detailNodes.get(index)
+        if (panel) { this.detailObserver?.unobserve(panel); panel.remove(); this.detailNodes.delete(index) }
       }
     }
 
@@ -532,6 +700,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         : this.buildRow(i, display?.row, columns, rowHeight, display?.level ?? 0)
       this.renderedRows.set(i, node)
       this.bodyEl.append(node)
+
+      // Le panneau de détail est un nœud frère, positionné juste sous sa
+      // ligne : l'inclure DANS la ligne obligerait celle-ci à changer de
+      // hauteur, ce que le recyclage ne saurait pas défaire proprement.
+      if (display?.kind === 'leaf' && this.isDetailOpenAt(i, display.row)) {
+        this.bodyEl.append(this.mountDetailPanel(i, display.row, rowHeight))
+      }
     }
   }
 
@@ -557,7 +732,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         'aria-rowindex': index + 1,
         'aria-selected': this.isSelectionEnabled() ? String(selected) : undefined,
       },
-      style: { height: `${rowHeight}px`, transform: `translateY(${index * rowHeight}px)` },
+      style: {
+        height: `${rowHeight}px`,
+        transform: `translateY(${this.detailLayout.offsetOf(index)}px)`,
+      },
     })
     if (!row) node.dataset.skeleton = '1'
 
@@ -607,6 +785,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     if (column.id === SELECTION_COLUMN_ID) {
       if (row) cell.append(this.buildRowCheckbox(row, rowIndex))
+      return cell
+    }
+
+    if (column.id === DETAIL_COLUMN_ID) {
+      if (row && this.isMasterRow(row, rowIndex)) {
+        cell.append(this.buildDetailToggle(row, rowIndex))
+      }
       return cell
     }
 
@@ -675,7 +860,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         'aria-expanded': String(expanded),
         'data-group-path': group.path,
       },
-      style: { height: `${rowHeight}px`, transform: `translateY(${index * rowHeight}px)` },
+      style: {
+        height: `${rowHeight}px`,
+        transform: `translateY(${this.detailLayout.offsetOf(index)}px)`,
+      },
     })
 
     for (const column of columns) {
@@ -1004,6 +1192,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       ...this.columnModel.getState(),
       rowGroup: this.grouping.getGroupBy(),
       expandedGroups: this.grouping.getExpanded(),
+      openDetails: this.details.getOpen(),
     }
   }
 
@@ -1012,6 +1201,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     if (state.rowGroup) this.applyRowGroup(state.rowGroup)
     if (state.expandedGroups) {
       this.grouping.setExpanded(state.expandedGroups)
+      this.render()
+    }
+    if (state.openDetails) {
+      this.details.restore(state.openDetails)
       this.render()
     }
   }
@@ -1328,6 +1521,27 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.render()
   }
 
+  /* --- détail --- */
+
+  toggleDetail(rowId: string): void {
+    if (!this.options.masterDetail) return
+    this.details.toggle(rowId)
+    this.renderedRows.clear()
+    this.detailNodes.clear()
+    this.bodyEl.replaceChildren()
+    this.renderBody()
+    this.emitState()
+  }
+
+  isDetailOpen(rowId: string): boolean {
+    return this.details.isOpen(rowId)
+  }
+
+  closeAllDetails(): void {
+    this.details.closeAll()
+    this.render()
+  }
+
   /* --- divers --- */
 
   setLocale(locale: LocaleCode): void {
@@ -1344,6 +1558,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.destroyed = true
     if (this.scrollFrame) cancelAnimationFrame(this.scrollFrame)
     this.contextMenu?.close()
+    this.detailObserver?.disconnect()
     this.resizeObserver?.disconnect()
     this.themeMediaQuery?.removeEventListener('change', this.onSystemTheme)
     this.cache.destroy()
