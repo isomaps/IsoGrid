@@ -102,6 +102,25 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
         }
       }
 
+      // Les colonnes déclarées en PHP ne peuvent pas porter de fonction non
+      // plus : `cellRenderer`, `valueFormatter` et `cellClass` acceptent donc
+      // un nom de fonction globale. Chacune reçoit le contexte de cellule et
+      // `$wire`, comme les autres points d'extension.
+      const auFilDesColonnes = ['cellRenderer', 'valueFormatter', 'cellClass'] as const
+      if (Array.isArray(cfg.columns)) {
+        options.columns = cfg.columns.map((col) => {
+          const brut = col as unknown as Record<string, unknown>
+          let copie: Record<string, unknown> | null = null
+          for (const cle of auFilDesColonnes) {
+            if (typeof brut[cle] !== 'string') continue
+            const fn = resoudre(brut[cle] as string, `le rendu de colonne « ${String(brut.id)} »`)
+            copie ??= { ...brut }
+            copie[cle] = (ctx: unknown) => fn(ctx, this.$wire)
+          }
+          return (copie ?? brut) as never
+        })
+      }
+
       const ra = cfg.rowActions as (typeof cfg.rowActions & { items: unknown }) | undefined
       if (ra && typeof ra.items === 'string') {
         const fn = resoudre(ra.items, 'le fournisseur d\'actions')

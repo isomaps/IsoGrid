@@ -423,6 +423,29 @@ Trois cibles, du socle au plus intégré.
 `persistKey` sauvegarde l'état dans `localStorage`. Alpine appelle lui-même
 `destroy()` au démontage.
 
+### Déclarer des fonctions depuis Blade
+
+PHP ne sérialise pas de fonction. Tout point d'extension accepte donc un **nom
+de fonction globale**, résolu sur `window` et appelé avec `$wire` en dernier
+argument — ce qui lui permet d'appeler une méthode du composant Livewire
+porteur sans route dédiée :
+
+```php
+'columns' => [
+    ['id' => 'os', 'header' => 'OS', 'cellRenderer' => 'monRenduOs'],
+],
+'rowActions' => ['items' => 'mesActions', 'urls' => $this->urls()],
+'masterDetail' => ['renderer' => 'monDetail'],
+```
+
+```js
+window.monRenduOs = (ctx, wire) => { /* … */ }
+```
+
+Concerné : `cellRenderer`, `valueFormatter` et `cellClass` sur une colonne,
+`rowActions.items`, `masterDetail.renderer`. Un nom introuvable lève une
+erreur explicite au montage plutôt que d'échouer silencieusement.
+
 ### 3. Livewire / Filament
 
 Le plus intégré : la grille appelle les méthodes du composant Livewire qui la
