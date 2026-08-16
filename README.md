@@ -446,6 +446,33 @@ Concerné : `cellRenderer`, `valueFormatter` et `cellClass` sur une colonne,
 `rowActions.items`, `masterDetail.renderer`. Un nom introuvable lève une
 erreur explicite au montage plutôt que d'échouer silencieusement.
 
+#### Rappels d'événement désignables par nom
+
+Comme les rendus de colonne, les rappels acceptent un **nom de fonction
+globale** — `onSelectionChanged`, `onStateChange`, `onError`. Chacun reçoit
+ses arguments habituels, suivis de `$wire`. C'est ce qui permet à une page
+Blade de renvoyer la sélection courante vers son composant Livewire, donc d'y
+brancher des actions de masse, sans écrire de JavaScript applicatif :
+
+```blade
+<x-isogrid :columns="[...]" source="livewire"
+           :config="['onSelectionChanged' => 'maSelection']" />
+```
+
+```js
+window.maSelection = (selection, grid, wire) => {
+    const etat = grid.getState()
+    wire.call('selectionChangee', {
+        mode: selection.mode, ids: selection.ids,
+        filters: etat.filters, quickFilter: etat.quickFilter,
+    })
+}
+```
+
+Envoyer aussi les filtres n'est pas superflu : en mode `exclude`, la sélection
+dit « tout sauf ces trois-là », et « tout » n'a de sens que rapporté au jeu
+filtré du moment.
+
 ### 3. Livewire / Filament
 
 Le plus intégré : la grille appelle les méthodes du composant Livewire qui la

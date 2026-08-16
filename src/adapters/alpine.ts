@@ -60,13 +60,12 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
 
       const restored = cfg.persistKey ? readState(cfg.persistKey) : undefined
 
+      // `onStateChange` n'est pas enveloppé ici : il peut encore être un NOM
+      // de fonction à ce stade. La persistance s'y greffe plus bas, une fois
+      // les rappels résolus.
       const options: IsoGridOptions<AnyRow> = {
         ...cfg,
         initialState: restored ?? cfg.initialState,
-        onStateChange: (state) => {
-          if (cfg.persistKey) writeState(cfg.persistKey, state)
-          cfg.onStateChange?.(state)
-        },
       }
 
       if (cfg.source === 'livewire') {
@@ -119,6 +118,30 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
           }
           return (copie ?? brut) as never
         })
+      }
+
+      // Mêmes contraintes pour les rappels d'événement : PHP ne sérialise pas
+      // de fonction, donc `onSelectionChanged`, `onStateChange` et `onError`
+      // acceptent eux aussi un nom de fonction globale. C'est ce qui permet à
+      // une page Blade de renvoyer la sélection courante vers son composant
+      // Livewire — donc d'y brancher des actions de masse — sans écrire de
+      // JavaScript applicatif.
+      const rappels = ['onSelectionChanged', 'onStateChange', 'onError'] as const
+      for (const cle of rappels) {
+        const brut = (cfg as unknown as Record<string, unknown>)[cle]
+        if (typeof brut !== 'string') continue
+        const fn = resoudre(brut, `le rappel « ${cle} »`)
+        ;(options as unknown as Record<string, unknown>)[cle] =
+          (...args: unknown[]) => fn(...args, this.$wire)
+      }
+
+      // La persistance enveloppe `onStateChange` : elle doit venir APRÈS la
+      // résolution ci-dessus, sinon elle appellerait la chaîne au lieu de la
+      // fonction.
+      const suiteEtat = options.onStateChange
+      options.onStateChange = (state) => {
+        if (cfg.persistKey) writeState(cfg.persistKey, state)
+        suiteEtat?.(state)
       }
 
       const ra = cfg.rowActions as (typeof cfg.rowActions & { items: unknown }) | undefined
