@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IsoGrid — démonstration</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #020617; color: #e2e8f0; }
+    }
+    header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 19px; }
+    .sub { color: #64748b; font-size: 13px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .controls button, .controls select {
+      padding: 6px 11px;
+      font: inherit;
+      font-size: 13px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      color: inherit;
+      cursor: pointer;
+    }
+    @media (prefers-color-scheme: dark) {
+      .controls button, .controls select { background: #1e293b; border-color: #334155; }
+    }
+    #grid { flex: 1; min-height: 0; }
+
+    /* Rendu de cellule personnalisé — montre que l'hôte garde la main. */
+    .demo-chip {
+      display: inline-block;
+      padding: 1px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: #475569;
+    }
+    .demo-chip[data-status="payée"]     { background: #dcfce7; color: #15803d; }
+    .demo-chip[data-status="en retard"] { background: #fee2e2; color: #b91c1c; }
+    .demo-chip[data-status="envoyée"]   { background: #dbeafe; color: #1d4ed8; }
+    .demo-chip[data-status="annulée"]   { background: #f1f5f9; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>IsoGrid</h1>
+    <span class="sub">50 000 factures · modèle de lignes serveur · latence simulée 220 ms</span>
+  </header>
+
+  <div class="controls">
+    <button id="add-column" type="button">Ajouter une colonne</button>
+    <button id="remove-column" type="button">Retirer la dernière</button>
+    <button id="fit" type="button">Ajuster les largeurs</button>
+    <button id="reset" type="button">Réinitialiser l'état</button>
+    <select id="locale" aria-label="Langue">
+      <option value="fr">Français</option>
+      <option value="en">English</option>
+      <option value="de">Deutsch</option>
+      <option value="es">Español</option>
+      <option value="it">Italiano</option>
+    </select>
+    <select id="theme" aria-label="Thème">
+      <option value="auto">Thème système</option>
+      <option value="light">Clair</option>
+      <option value="dark">Sombre</option>
+    </select>
+  </div>
+
+  <div id="grid"></div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

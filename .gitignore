@@ -1,0 +1,14 @@
+node_modules/
+
+# Artefacts de build. `dist/` est le paquet npm, `dist-vendor/` le bundle
+# autonome destiné à public/vendor/ d'une application hôte : les deux se
+# régénèrent par `npm run build` et `npm run build:vendor`, et install.sh
+# reconstruit dist-vendor/ avant de copier. Les versionner ici produirait un
+# diff illisible à chaque commit, alors que la copie qui compte est celle
+# committée DANS l'application hôte.
+dist/
+dist-vendor/
+
+.DS_Store
+*.log
+.vite/

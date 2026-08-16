@@ -1,0 +1,896 @@
+/* ==========================================================================
+   IsoGrid — feuille de style
+   Tout est piloté par des variables CSS : un hôte redéfinit `--isg-*` sur
+   `.isg-root` (ou plus haut) pour adopter sa charte sans toucher aux règles.
+   ========================================================================== */
+
+.isg-root {
+  /* Surfaces */
+  --isg-bg: #ffffff;
+  --isg-bg-alt: #f8fafc;
+  --isg-bg-header: #f1f5f9;
+  --isg-bg-hover: #f1f5f9;
+  --isg-bg-elevated: #ffffff;
+  --isg-bg-skeleton: #e2e8f0;
+
+  /* Texte */
+  --isg-fg: #0f172a;
+  --isg-fg-muted: #64748b;
+  --isg-fg-header: #334155;
+
+  /* Traits */
+  --isg-border: #e2e8f0;
+  --isg-border-strong: #cbd5e1;
+
+  /* Accent */
+  --isg-accent: #2563eb;
+  --isg-accent-fg: #ffffff;
+  --isg-accent-soft: #dbeafe;
+
+  --isg-danger: #dc2626;
+
+  /* Formes */
+  --isg-radius: 8px;
+  --isg-radius-sm: 5px;
+  --isg-shadow: 0 8px 24px -6px rgb(15 23 42 / 18%), 0 2px 6px -2px rgb(15 23 42 / 10%);
+  --isg-shadow-pin: 6px 0 8px -6px rgb(15 23 42 / 28%);
+  --isg-shadow-pin-end: -6px 0 8px -6px rgb(15 23 42 / 28%);
+
+  /* Rythme */
+  --isg-font: inherit;
+  --isg-font-size: 13px;
+  --isg-cell-padding: 10px;
+  --isg-sidebar-width: 260px;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  font-family: var(--isg-font);
+  font-size: var(--isg-font-size);
+  color: var(--isg-fg);
+  background: var(--isg-bg);
+  border: 1px solid var(--isg-border);
+  border-radius: var(--isg-radius);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.isg-root *,
+.isg-root *::before,
+.isg-root *::after { box-sizing: border-box; }
+
+/* --- Thème sombre : explicite, puis système ------------------------------ */
+
+.isg-root[data-isg-theme='dark'] { color-scheme: dark; }
+
+.isg-root[data-isg-theme='dark'],
+.isg-popover[data-isg-theme='dark'] {
+  --isg-bg: #0f172a;
+  --isg-bg-alt: #131f36;
+  --isg-bg-header: #1e293b;
+  --isg-bg-hover: #1e293b;
+  --isg-bg-elevated: #1e293b;
+  --isg-bg-skeleton: #334155;
+  --isg-fg: #e2e8f0;
+  --isg-fg-muted: #94a3b8;
+  --isg-fg-header: #cbd5e1;
+  --isg-border: #1e293b;
+  --isg-border-strong: #334155;
+  --isg-accent: #60a5fa;
+  --isg-accent-fg: #0f172a;
+  --isg-accent-soft: #1e3a5f;
+  --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
+  --isg-shadow-pin: 6px 0 8px -6px rgb(0 0 0 / 60%);
+  --isg-shadow-pin-end: -6px 0 8px -6px rgb(0 0 0 / 60%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .isg-root:not([data-isg-theme='light']) {
+    color-scheme: dark;
+    --isg-bg: #0f172a;
+    --isg-bg-alt: #131f36;
+    --isg-bg-header: #1e293b;
+    --isg-bg-hover: #1e293b;
+    --isg-bg-elevated: #1e293b;
+    --isg-bg-skeleton: #334155;
+    --isg-fg: #e2e8f0;
+    --isg-fg-muted: #94a3b8;
+    --isg-fg-header: #cbd5e1;
+    --isg-border: #1e293b;
+    --isg-border-strong: #334155;
+    --isg-accent: #60a5fa;
+    --isg-accent-fg: #0f172a;
+    --isg-accent-soft: #1e3a5f;
+    --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
+    --isg-shadow-pin: 6px 0 8px -6px rgb(0 0 0 / 60%);
+    --isg-shadow-pin-end: -6px 0 8px -6px rgb(0 0 0 / 60%);
+  }
+}
+
+/* --- Icônes embarquées (SVG inline) ------------------------------------- */
+
+.isg-icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: -0.125em;
+  overflow: visible;
+}
+svg.isg-icon { font-size: 1.05em; }
+
+.isg-icon-spinner { animation: isg-spin .9s linear infinite; }
+@keyframes isg-spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) {
+  .isg-icon-spinner { animation-duration: 2.4s; }
+}
+
+/* ==========================================================================
+   Barre d'outils
+   ========================================================================== */
+
+.isg-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--isg-bg);
+  border-bottom: 1px solid var(--isg-border);
+  flex: none;
+}
+
+.isg-toolbar-left,
+.isg-toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+/* Recherche en pilule, icône à l'intérieur : c'est la forme employée par les
+   tables Filament, et la grille doit se poser dans ce back-office sans
+   détonner. */
+.isg-search-box { position: relative; display: flex; align-items: center; }
+.isg-search-box .isg-icon {
+  position: absolute;
+  left: 11px;
+  color: var(--isg-fg-muted);
+  pointer-events: none;
+  font-size: 15px;
+}
+.isg-input.isg-quick-filter {
+  padding-left: 32px;
+  min-width: 240px;
+  border-radius: 999px;
+}
+.isg-quick-filter::-webkit-search-cancel-button { cursor: pointer; }
+
+/* Entrées de panneau : pictogramme seul, comme le filtre et le sélecteur de
+   colonnes de Filament. */
+/* Sélecteurs composés VOLONTAIREMENT : `.isg-icon-btn` et `.isg-input` sont
+   déclarés plus bas dans ce fichier ; à spécificité égale, ils gagneraient. */
+.isg-icon-btn.isg-panel-btn {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  font-size: 17px;
+  color: var(--isg-fg-muted);
+  overflow: visible;
+}
+.isg-icon-btn.isg-panel-btn:hover { color: var(--isg-fg); background: var(--isg-bg-hover); }
+.isg-icon-btn.isg-panel-btn.isg-active { color: var(--isg-accent); }
+
+.isg-count-badge {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--isg-bg-alt);
+  color: var(--isg-fg-muted);
+  border: 1px solid var(--isg-border);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.isg-count-badge.isg-active {
+  background: var(--isg-accent);
+  border-color: var(--isg-accent);
+  color: #fff;
+}
+
+/* ==========================================================================
+   Zone principale
+   ========================================================================== */
+
+.isg-main { display: flex; flex: 1; min-height: 0; }
+.isg-viewport-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+
+.isg-viewport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  outline: none;
+  scrollbar-width: thin;
+}
+.isg-viewport:focus-visible { box-shadow: inset 0 0 0 2px var(--isg-accent); }
+
+/* ==========================================================================
+   En-tête
+   ========================================================================== */
+
+.isg-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--isg-bg);
+}
+
+.isg-header-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--isg-border);
+  background: var(--isg-bg);
+}
+.isg-header-row-group .isg-hcell { font-weight: 600; justify-content: center; }
+
+/* Fond identique au corps et pas de bordure pleine : la colonne est marquée
+   par un court trait vertical, comme dans AG Grid. Une grille de bordures
+   pleines alourdit visuellement un tableau large. */
+.isg-hcell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 0 var(--isg-cell-padding);
+  font-weight: 500;
+  color: var(--isg-fg);
+  background: var(--isg-bg);
+  user-select: none;
+  overflow: hidden;
+}
+.isg-hcell + .isg-hcell::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 1px;
+  background: var(--isg-border);
+}
+.isg-header-row-group .isg-hcell::before { top: 20%; height: 60%; }
+.isg-hcell:focus-visible { outline: 2px solid var(--isg-accent); outline-offset: -2px; }
+.isg-hcell-empty { background: var(--isg-bg); }
+
+.isg-hcell-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+}
+.isg-hcell-main.isg-sortable { cursor: pointer; }
+.isg-hcell-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.isg-sort-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--isg-fg-muted);
+  opacity: .35;
+  transition: opacity .12s ease;
+  font-size: 11px;
+}
+.isg-hcell:hover .isg-sort-indicator,
+.isg-sort-indicator.isg-active { opacity: 1; }
+.isg-sort-indicator.isg-active { color: var(--isg-accent); }
+.isg-sort-index {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: var(--isg-accent-soft);
+  color: var(--isg-accent);
+}
+
+/* Le filtre reste TOUJOURS visible : à `opacity: 0` il restait cliquable tout
+   en étant invisible, donc introuvable. Le menu, lui, est une action
+   secondaire — il n'apparaît qu'au survol ET ne réserve aucune largeur hors
+   survol, sinon il rogne le libellé de chaque colonne en permanence. */
+.isg-hcell-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+.isg-filter-btn { opacity: .5; transition: opacity .12s ease; }
+.isg-hcell:hover .isg-filter-btn { opacity: 1; }
+.isg-filter-btn.isg-active { opacity: 1; color: var(--isg-accent); }
+
+/* L'ellipsis reste visible : la masquer hors survol la rendait introuvable.
+   La largeur des colonnes a été ajustée en conséquence. */
+.isg-menu-btn { opacity: .45; transition: opacity .12s ease; }
+.isg-hcell:hover .isg-menu-btn,
+.isg-hcell:focus-within .isg-menu-btn { opacity: 1; }
+
+.isg-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+}
+.isg-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  left: 3px;
+  width: 1px;
+  height: 60%;
+  background: transparent;
+  transition: background .12s ease;
+}
+.isg-resize-handle:hover::after { background: var(--isg-accent); }
+body.isg-resizing { cursor: col-resize; user-select: none; }
+
+/* Déplacement de colonne */
+.isg-hcell.isg-dragging { opacity: .4; }
+.isg-hcell.isg-drop-before { box-shadow: inset 3px 0 0 0 var(--isg-accent); }
+.isg-hcell.isg-drop-after { box-shadow: inset -3px 0 0 0 var(--isg-accent); }
+
+/* ==========================================================================
+   Corps
+   ========================================================================== */
+
+.isg-body { position: relative; }
+
+.isg-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  border-bottom: 1px solid var(--isg-border);
+  background: var(--isg-bg);
+  will-change: transform;
+}
+.isg-striped .isg-row-odd { background: var(--isg-bg-alt); }
+.isg-row:hover { background: var(--isg-bg-hover); }
+.isg-row:hover .isg-cell { background: inherit; }
+
+.isg-cell {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 var(--isg-cell-padding);
+  background: inherit;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.isg-cell > * { overflow: hidden; text-overflow: ellipsis; }
+
+.isg-align-right { justify-content: flex-end; text-align: right; }
+.isg-align-center { justify-content: center; text-align: center; }
+.isg-align-left { justify-content: flex-start; text-align: left; }
+
+/* Colonnes épinglées : le fond doit être opaque, sinon le contenu défile
+   visiblement dessous. */
+.isg-pinned-start,
+.isg-pinned-end { background: var(--isg-bg); }
+.isg-striped .isg-row-odd .isg-pinned-start,
+.isg-striped .isg-row-odd .isg-pinned-end { background: var(--isg-bg-alt); }
+.isg-row:hover .isg-pinned-start,
+.isg-row:hover .isg-pinned-end { background: var(--isg-bg-hover); }
+.isg-hcell.isg-pinned-start,
+.isg-hcell.isg-pinned-end { background: var(--isg-bg); }
+
+.isg-pin-edge-start { box-shadow: var(--isg-shadow-pin); }
+.isg-pin-edge-end { box-shadow: var(--isg-shadow-pin-end); }
+
+/* Squelette de chargement */
+.isg-row-loading .isg-cell { color: transparent; }
+.isg-skeleton {
+  display: block;
+  width: 70%;
+  height: 9px;
+  border-radius: 4px;
+  background: var(--isg-bg-skeleton);
+  animation: isg-pulse 1.3s ease-in-out infinite;
+}
+@keyframes isg-pulse { 0%, 100% { opacity: .45 } 50% { opacity: .9 } }
+@media (prefers-reduced-motion: reduce) {
+  .isg-skeleton { animation: none; }
+}
+
+/* ==========================================================================
+   Superposition (vide / erreur)
+   ========================================================================== */
+
+.isg-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 6;
+}
+.isg-overlay.isg-visible { display: flex; }
+.isg-overlay-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: var(--isg-radius);
+  background: var(--isg-bg-elevated);
+  border: 1px solid var(--isg-border);
+  box-shadow: var(--isg-shadow);
+  color: var(--isg-fg-muted);
+  pointer-events: auto;
+}
+.isg-overlay-error { color: var(--isg-danger); border-color: var(--isg-danger); }
+
+/* ==========================================================================
+   Barre d'état
+   ========================================================================== */
+
+.isg-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--isg-fg-muted);
+  background: var(--isg-bg-alt);
+  border-top: 1px solid var(--isg-border);
+  flex: none;
+}
+.isg-status-count { font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Panneau latéral
+   ========================================================================== */
+
+.isg-sidebar {
+  display: flex;
+  flex: none;
+  background: var(--isg-bg);
+  min-height: 0;
+}
+/* La bordure n'apparaît qu'une fois le panneau ouvert : fermé et sans onglets,
+   il ne doit laisser aucune trace. */
+.isg-sidebar.isg-open { border-left: 1px solid var(--isg-border); }
+.isg-sidebar-start.isg-open { border-left: none; border-right: 1px solid var(--isg-border); }
+.isg-sidebar-start { order: -1; border-left: none; border-right: 1px solid var(--isg-border); }
+
+.isg-sidebar-tabs[style*="display: none"] { border: none; }
+.isg-sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 4px;
+  background: var(--isg-bg-alt);
+  border-left: 1px solid var(--isg-border);
+  order: 2;
+  flex: none;
+}
+.isg-sidebar-start .isg-sidebar-tabs { order: -1; border-left: none; border-right: 1px solid var(--isg-border); }
+
+.isg-sidebar-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--isg-radius-sm);
+  background: transparent;
+  color: var(--isg-fg-muted);
+  cursor: pointer;
+  font: inherit;
+}
+.isg-sidebar-tab:hover { background: var(--isg-bg-hover); color: var(--isg-fg); }
+.isg-sidebar-tab.isg-active { background: var(--isg-accent); color: var(--isg-accent-fg); }
+.isg-sidebar-tab-label { display: none; }
+
+.isg-sidebar-body {
+  width: 0;
+  overflow: hidden auto;
+  transition: width .16s ease;
+  order: 1;
+}
+.isg-sidebar.isg-open .isg-sidebar-body {
+  width: var(--isg-sidebar-width);
+  padding: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .isg-sidebar-body { transition: none; }
+}
+
+.isg-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--isg-danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+.isg-accordion-header .isg-badge,
+.isg-sidebar-tab.isg-active .isg-badge { position: static; }
+
+/* --- Panneau colonnes --- */
+
+.isg-panel-header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.isg-panel-actions { display: flex; gap: 4px; }
+.isg-panel-empty { padding: 16px 4px; color: var(--isg-fg-muted); text-align: center; }
+
+.isg-column-list { display: flex; flex-direction: column; gap: 1px; }
+
+.isg-column-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  border-radius: var(--isg-radius-sm);
+  cursor: grab;
+}
+.isg-column-row:hover { background: var(--isg-bg-hover); }
+.isg-column-row.isg-dragging { opacity: .4; }
+.isg-column-row.isg-drop-before { box-shadow: inset 0 2px 0 0 var(--isg-accent); }
+.isg-column-row.isg-drop-after { box-shadow: inset 0 -2px 0 0 var(--isg-accent); }
+
+.isg-column-grip { color: var(--isg-border-strong); font-size: 11px; cursor: grab; }
+.isg-column-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.isg-column-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-column-pins { display: flex; gap: 1px; opacity: .4; transition: opacity .12s ease; }
+.isg-column-row:hover .isg-column-pins,
+.isg-column-row:focus-within .isg-column-pins { opacity: 1; }
+.isg-pin-btn.isg-active { opacity: 1; color: var(--isg-accent); }
+.isg-column-row:has(.isg-pin-btn.isg-active) .isg-column-pins { opacity: 1; }
+.isg-pin-btn[title]:last-child .isg-icon { transform: scaleX(-1); }
+
+/* --- Panneau filtres --- */
+
+.isg-filter-list { display: flex; flex-direction: column; gap: 2px; }
+
+.isg-accordion { border: 1px solid var(--isg-border); border-radius: var(--isg-radius-sm); overflow: hidden; }
+.isg-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.isg-accordion-header:hover { background: var(--isg-bg-hover); }
+.isg-accordion-header.isg-active { color: var(--isg-accent); font-weight: 600; }
+.isg-accordion-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-accordion-header .isg-icon { transition: transform .14s ease; font-size: 10px; }
+.isg-accordion.isg-open .isg-accordion-header .isg-icon { transform: rotate(90deg); }
+.isg-accordion-body { display: none; padding: 0 8px 8px; }
+.isg-accordion.isg-open .isg-accordion-body { display: block; }
+
+/* ==========================================================================
+   Flottants : menus et popovers
+   ========================================================================== */
+
+.isg-popover {
+  position: fixed;
+  z-index: 9999;
+  min-width: 210px;
+  max-width: 320px;
+  padding: 6px;
+  border-radius: var(--isg-radius);
+  background: var(--isg-bg-elevated);
+  border: 1px solid var(--isg-border-strong);
+  box-shadow: var(--isg-shadow);
+  color: var(--isg-fg);
+  font-family: var(--isg-font);
+  font-size: var(--isg-font-size);
+
+  /* Un flottant vit dans `document.body`, hors de `.isg-root` : il lui faut
+     donc sa propre copie des tokens. */
+  --isg-bg-elevated: #ffffff;
+  --isg-bg-hover: #f1f5f9;
+  --isg-bg-alt: #f8fafc;
+  --isg-fg: #0f172a;
+  --isg-fg-muted: #64748b;
+  --isg-border: #e2e8f0;
+  --isg-border-strong: #cbd5e1;
+  --isg-accent: #2563eb;
+  --isg-accent-soft: #dbeafe;
+  --isg-danger: #dc2626;
+  --isg-radius: 8px;
+  --isg-radius-sm: 5px;
+  --isg-font: inherit;
+  --isg-font-size: 13px;
+  --isg-shadow: 0 8px 24px -6px rgb(15 23 42 / 18%), 0 2px 6px -2px rgb(15 23 42 / 10%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .isg-popover:not([data-isg-theme='light']) {
+    color-scheme: dark;
+    --isg-bg-elevated: #1e293b;
+    --isg-bg-hover: #334155;
+    --isg-bg-alt: #131f36;
+    --isg-fg: #e2e8f0;
+    --isg-fg-muted: #94a3b8;
+    --isg-border: #334155;
+    --isg-border-strong: #475569;
+    --isg-accent: #60a5fa;
+    --isg-accent-soft: #1e3a5f;
+    --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
+  }
+}
+
+.isg-popover-title {
+  padding: 4px 8px 7px;
+  font-weight: 600;
+  color: var(--isg-fg-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--isg-border);
+  margin-bottom: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.isg-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--isg-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.isg-menu-item:hover,
+.isg-menu-item:focus-visible { background: var(--isg-bg-hover); outline: none; }
+.isg-menu-item.isg-active { color: var(--isg-accent); font-weight: 600; }
+.isg-menu-item .isg-icon { width: 14px; text-align: center; color: var(--isg-fg-muted); font-size: 12px; }
+.isg-menu-item.isg-active .isg-icon { color: var(--isg-accent); }
+.isg-menu-sep { height: 1px; margin: 4px 2px; background: var(--isg-border); }
+
+/* ==========================================================================
+   Éditeur de filtre
+   ========================================================================== */
+
+.isg-filter { display: flex; flex-direction: column; gap: 7px; padding: 2px; }
+.isg-filter-conditions { display: flex; flex-direction: column; gap: 6px; }
+.isg-filter-row { display: flex; align-items: center; gap: 5px; }
+.isg-filter-row .isg-input { flex: 1; min-width: 0; }
+
+.isg-filter-join { display: flex; gap: 3px; }
+.isg-join-btn {
+  padding: 2px 9px;
+  border: 1px solid var(--isg-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--isg-fg-muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+.isg-join-btn.isg-active {
+  background: var(--isg-accent);
+  border-color: var(--isg-accent);
+  color: #fff;
+}
+
+.isg-filter-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border: none;
+  background: transparent;
+  color: var(--isg-accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.isg-filter-add:hover { text-decoration: underline; }
+
+.isg-filter-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 5px;
+  border-top: 1px solid var(--isg-border);
+}
+
+.isg-filter-loading,
+.isg-filter-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  color: var(--isg-fg-muted);
+}
+
+.isg-filter-set { display: flex; flex-direction: column; gap: 6px; }
+.isg-filter-search { width: 100%; }
+.isg-set-list { display: flex; flex-direction: column; max-height: 220px; overflow-y: auto; }
+
+.isg-set-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 4px;
+  border-radius: var(--isg-radius-sm);
+  cursor: pointer;
+}
+.isg-set-option:hover { background: var(--isg-bg-hover); }
+.isg-set-all { border-bottom: 1px solid var(--isg-border); padding-bottom: 5px; margin-bottom: 2px; font-weight: 600; }
+.isg-set-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-set-count { color: var(--isg-fg-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* ==========================================================================
+   Contrôles de formulaire
+   ========================================================================== */
+
+.isg-input,
+.isg-select {
+  padding: 5px 8px;
+  border: 1px solid var(--isg-border-strong);
+  border-radius: var(--isg-radius-sm);
+  background: var(--isg-bg);
+  color: var(--isg-fg);
+  font: inherit;
+  font-size: var(--isg-font-size);
+  min-width: 0;
+}
+.isg-popover .isg-input,
+.isg-popover .isg-select { background: var(--isg-bg-elevated); }
+.isg-input:focus,
+.isg-select:focus {
+  outline: none;
+  border-color: var(--isg-accent);
+  box-shadow: 0 0 0 3px var(--isg-accent-soft);
+}
+.isg-input::placeholder { color: var(--isg-fg-muted); }
+
+.isg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--isg-border-strong);
+  border-radius: var(--isg-radius-sm);
+  background: var(--isg-bg);
+  color: var(--isg-fg);
+  font: inherit;
+  font-size: var(--isg-font-size);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.isg-popover .isg-btn { background: var(--isg-bg-elevated); }
+.isg-btn:hover:not(:disabled) { background: var(--isg-bg-hover); }
+.isg-btn:disabled { opacity: .5; cursor: not-allowed; }
+.isg-btn-ghost { border-color: transparent; background: transparent; }
+.isg-btn-ghost:hover:not(:disabled) { background: var(--isg-bg-hover); }
+.isg-btn-sm { padding: 2px 7px; font-size: 11px; }
+
+.isg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--isg-radius-sm);
+  background: transparent;
+  color: var(--isg-fg-muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+.isg-icon-btn:hover { background: var(--isg-bg-hover); color: var(--isg-fg); }
+
+.isg-btn:focus-visible,
+.isg-icon-btn:focus-visible,
+.isg-sidebar-tab:focus-visible,
+.isg-menu-item:focus-visible,
+.isg-accordion-header:focus-visible {
+  outline: 2px solid var(--isg-accent);
+  outline-offset: 1px;
+}
+
+.isg-root.isg-busy { cursor: progress; }
+.isg-root.isg-busy .isg-toolbar { pointer-events: none; opacity: .6; }
+
+/* ==========================================================================
+   Menu contextuel (clic droit) et confirmation de copie
+   ========================================================================== */
+
+.isg-context-menu { min-width: 215px; }
+
+/* Icônes nettement plus lisibles ici que dans les menus d'en-tête : un menu
+   contextuel se parcourt à la volée, le pictogramme y porte autant que le
+   libellé. */
+.isg-context-menu .isg-menu-item {
+  gap: 11px;
+  padding: 8px 10px;
+}
+.isg-context-menu .isg-menu-item .isg-icon {
+  width: 18px;
+  font-size: 17px;
+  color: var(--isg-fg-muted);
+}
+.isg-context-menu .isg-menu-item:hover .isg-icon { color: var(--isg-fg); }
+.isg-context-menu .isg-menu-item:disabled { opacity: .45; cursor: not-allowed; }
+
+.isg-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 13px;
+  font-family: inherit;
+  box-shadow: 0 10px 28px -8px rgb(15 23 42 / 45%);
+  transform: translate(-50%, 0);
+  animation: isg-toast-in .18s ease-out;
+}
+.isg-toast-error { background: var(--isg-danger, #dc2626); }
+.isg-toast .isg-icon { font-size: 14px; }
+
+.isg-toast-out {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+@keyframes isg-toast-in {
+  from { opacity: 0; transform: translate(-50%, 10px) }
+  to   { opacity: 1; transform: translate(-50%, 0) }
+}
+@media (prefers-reduced-motion: reduce) {
+  .isg-toast { animation: none; }
+  .isg-toast-out { transition: none; }
+}
