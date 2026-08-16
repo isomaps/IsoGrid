@@ -771,9 +771,17 @@ export const catalogs: Record<LocaleCode, Catalog> = { fr, en, de, es, it, nl, p
 /** Locales prises en charge, dans l'ordre de préférence maison. */
 export const SUPPORTED_LOCALES: LocaleCode[] = ['fr', 'en', 'de', 'es', 'it', 'nl', 'pl', 'ru']
 
+/**
+ * Ramène un code de langue à un catalogue disponible.
+ *
+ * Découpe sur `-` ET sur `_` : les applications Laravel écrivent volontiers
+ * `fr_CH`, là où le web écrit `fr-CH`. Sans le tiret bas, `fr_ch` ne serait
+ * pas reconnu comme du français et retomberait sur le défaut — au bon
+ * résultat par hasard, mais faux pour `de_AT`, `nl_BE` ou `pt_BR`.
+ */
 export function resolveLocale(input?: string): LocaleCode {
   if (!input) return 'fr'
-  const base = input.toLowerCase().split('-')[0] as LocaleCode
+  const base = input.toLowerCase().split(/[-_]/)[0] as LocaleCode
   return SUPPORTED_LOCALES.includes(base) ? base : 'fr'
 }
 
