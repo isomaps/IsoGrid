@@ -467,6 +467,55 @@ class ListUsers extends Page
 <x-isogrid :columns="$this->gridColumns()" source="livewire" height="calc(100vh - 15rem)" />
 ```
 
+#### Déclencher une modale Filament depuis la grille
+
+Une action de ligne peut monter une action Filament de la page hôte, ce qui
+réutilise **la même modale, le même formulaire et le même traitement** que la
+table d'origine — rien n'est réimplémenté en JavaScript :
+
+```js
+window.mesActions = (row, wire) => [
+    { label: 'Modifier le plan', action: () => wire.mountAction('changerPlan', { record: row.id }) },
+]
+```
+
+Côté page, l'action lit sa cible dans `$arguments` plutôt que dans `$record` :
+
+```php
+public function changerPlanAction(): Action
+{
+    return Action::make('changerPlan')
+        ->form([...])
+        ->action(fn (array $arguments, array $data) => /* ... */);
+}
+```
+
+**Deux pièges, tous deux silencieux.**
+
+1. `<x-filament-actions::modals />` produit bien le balisage de la modale,
+   mais ne suffit pas à l'ouvrir : Filament n'enregistre le déclencheur que si
+   **l'objet d'action est lui-même rendu**. Sans cela, `mountAction()`
+   fonctionne côté serveur, le HTML de la modale est dans le DOM… et rien ne
+   s'affiche. Il faut donc rendre les actions, même sans se servir de leurs
+   boutons :
+
+   ```blade
+   <div class="hidden" aria-hidden="true">
+       {{ $this->changerPlanAction }}
+   </div>
+
+   <x-filament-actions::modals />
+   ```
+
+   Le symptôme est trompeur : une action à `->modalContent()` s'ouvre malgré
+   tout, seules celles à `->form()` restent invisibles.
+
+2. Les icônes de police éventuellement utilisées dans vos rendus de cellule
+   doivent être chargées **sur cette page**. Un panneau Filament n'embarque
+   pas Font Awesome par défaut, et beaucoup d'applications l'enregistrent page
+   par page : une cellule qui ne contient qu'un `<i class="fa-…">` sort alors
+   parfaitement vide.
+
 ### Installation dans une application
 
 ```bash
