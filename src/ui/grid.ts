@@ -4,6 +4,10 @@ import type {
   SetFilterOption, SortModel, ThemeMode,
 } from '../core/types'
 import { ColumnModel, type RenderColumn } from '../core/table'
+import {
+  SELECTION_COLUMN_ID, SelectionModel,
+  type SelectionSnapshot, type SelectionState,
+} from '../core/selection'
 import { Translator, resolveLocale } from '../core/i18n'
 import { BlockCache, createHttpDatasource } from '../datasource/server'
 import { ClientDatasource } from '../datasource/client'
@@ -24,6 +28,7 @@ const DEFAULTS = {
   blockSize: 100,
   maxBlocksInCache: 20,
   defaultColumnWidth: 160,
+  selectionColumnWidth: 44,
   /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
   overscan: 6,
 } as const
@@ -34,6 +39,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private columnModel: ColumnModel
   private cache: BlockCache<TRow>
   private clientSource?: ClientDatasource<TRow>
+  private selection: SelectionModel
+  /** Dernière ligne cochée, pour la sélection de plage au Maj-clic. */
+  private lastSelectedIndex: number | null = null
   private ctx: GridContext
 
   /* --- DOM --- */
@@ -52,6 +60,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private scrollFrame = 0
   private destroyed = false
   private lastDataSignature = ''
+  private lastFilterSignature = ''
+  private warnedRowIds = false
   private lastError: unknown = null
   private themeMediaQuery?: MediaQueryList
   private resizeObserver?: ResizeObserver
@@ -60,8 +70,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.options = options
     this.t = new Translator(resolveLocale(options.locale), options.messages)
 
+    this.selection = new SelectionModel(() => this.onSelectionChange())
+
     this.columnModel = new ColumnModel({
       columns: options.columns as ColumnDef[],
+      selectionColumn: options.rowSelection === 'multiple'
+        ? { width: options.selectionColumnWidth ?? DEFAULTS.selectionColumnWidth }
+        : false,
       defaultColumn: options.defaultColumn as Partial<ColumnDef>,
       defaultColumnWidth: options.defaultColumnWidth ?? DEFAULTS.defaultColumnWidth,
       initialState: options.initialState,
@@ -87,6 +102,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       reload: () => this.reload(),
       emitState: () => this.emitState(),
       fetchSetValues: (columnId) => this.fetchSetValues(columnId),
+      selectAllCheckbox: options.rowSelection === 'multiple'
+        ? () => this.buildSelectAllCheckbox()
+        : undefined,
     }
 
     this.headerRenderer = new HeaderRenderer(this.ctx)
@@ -96,6 +114,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.root = this.buildLayout(container)
 
     this.lastDataSignature = this.dataSignature()
+    this.lastFilterSignature = this.filterSignature()
     this.applyTheme(options.theme ?? 'auto')
     this.render()
     this.refreshVisibleRange()
@@ -173,6 +192,95 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   /* -------------------------------------------------------------------- */
+  /* Sélection                                                             */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * Identifiant stable d'une ligne.
+   *
+   * L'index n'est un repli acceptable qu'en mode client : côté serveur il
+   * change dès qu'on retrie, et la sélection porterait alors sur d'autres
+   * lignes. D'où l'avertissement au montage.
+   */
+  private rowId(row: TRow, index: number): string {
+    if (this.options.getRowId) return this.options.getRowId(row, index)
+    const id = (row as AnyRow).id
+    return id != null ? String(id) : String(index)
+  }
+
+  private isSelectionEnabled(): boolean {
+    return this.options.rowSelection === 'single' || this.options.rowSelection === 'multiple'
+  }
+
+  /** Prévient si la sélection repose sur des index en mode serveur. */
+  private warnUnstableRowIds(): void {
+    if (!this.isSelectionEnabled() || this.clientSource) return
+    if (this.options.getRowId) return
+    const sample = this.cache.getLoadedRows()[0]
+    if (sample && (sample as AnyRow).id != null) return
+    console.warn(
+      '[IsoGrid] rowSelection est actif en mode serveur sans `getRowId` ni champ `id` : '
+      + "la sélection retombe sur l'index de ligne, qui change à chaque tri. "
+      + 'Fournir un identifiant métier stable.',
+    )
+  }
+
+  private onSelectionChange(): void {
+    if (this.destroyed) return
+    this.repaintSelection()
+    this.renderStatus()
+    this.options.onSelectionChanged?.(this.getSelection(), this)
+  }
+
+  /**
+   * Met à jour les cases et les classes des lignes visibles, sans reconstruire
+   * le corps : redessiner ferait perdre le focus et la position de défilement.
+   */
+  private repaintSelection(): void {
+    for (const [index, node] of this.renderedRows) {
+      const row = this.cache.getRow(index)
+      if (!row) continue
+      const selected = this.selection.isSelected(this.rowId(row, index))
+      node.classList.toggle(`${NS}-row-selected`, selected)
+      node.setAttribute('aria-selected', String(selected))
+      const box = node.querySelector<HTMLInputElement>(`.${NS}-select-box`)
+      if (box) box.checked = selected
+    }
+    this.syncHeaderCheckbox()
+  }
+
+  private syncHeaderCheckbox(): void {
+    const box = this.headerRenderer.element.querySelector<HTMLInputElement>(`.${NS}-select-all-box`)
+    if (!box) return
+    const state = this.selection.headerState(this.cache.getRowCount())
+    box.checked = state === 'all'
+    box.indeterminate = state === 'some'
+  }
+
+  /** Case d'en-tête « tout sélectionner ». Consommée par le rendu d'en-tête. */
+  buildSelectAllCheckbox(): HTMLElement {
+    const state = this.selection.headerState(this.cache.getRowCount())
+    const box = el('input', {
+      class: `${NS}-select-all-box`,
+      attrs: {
+        type: 'checkbox',
+        checked: state === 'all',
+        'aria-label': this.t.t('selectAllRows'),
+        title: this.t.t('selectAllRows'),
+      },
+      on: {
+        click: (e: MouseEvent) => e.stopPropagation(),
+        change: (e: Event) => {
+          const on = (e.target as HTMLInputElement).checked
+          on ? this.selection.selectAll() : this.selection.clear()
+        },
+      },
+    })
+    box.indeterminate = state === 'some'
+    return box
+  }
+
+  /* -------------------------------------------------------------------- */
   /* Cycle de rendu                                                        */
   /* -------------------------------------------------------------------- */
 
@@ -182,8 +290,25 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return JSON.stringify([state.sort, state.filters, state.quickFilter])
   }
 
+  /** Filtres et recherche seuls : le TRI ne change pas l'ensemble des lignes. */
+  private filterSignature(): string {
+    const state = this.columnModel.getState()
+    return JSON.stringify([state.filters, state.quickFilter])
+  }
+
   private onColumnModelChange(): void {
     if (this.destroyed) return
+
+    // Changer un filtre change l'ensemble des lignes : en mode `exclude`,
+    // « tout sauf ces trois-là » désignerait alors silencieusement d'autres
+    // lignes. Un tri, lui, ne fait que réordonner — la sélection reste juste.
+    const filterSignature = this.filterSignature()
+    if (filterSignature !== this.lastFilterSignature) {
+      this.lastFilterSignature = filterSignature
+      this.selection.clear()
+      this.lastSelectedIndex = null
+    }
+
     const signature = this.dataSignature()
     if (signature !== this.lastDataSignature) {
       this.lastDataSignature = signature
@@ -196,6 +321,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   private onDataChange(): void {
     if (this.destroyed) return
+    if (!this.warnedRowIds) { this.warnedRowIds = true; this.warnUnstableRowIds() }
     this.renderBody()
     this.renderStatus()
     this.renderOverlay()
@@ -328,9 +454,21 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     columns: RenderColumn[],
     rowHeight: number,
   ): HTMLElement {
+    const selected = row != null && this.isSelectionEnabled()
+      && this.selection.isSelected(this.rowId(row, index))
+
     const node = el('div', {
-      class: `${NS}-row${index % 2 === 1 ? ` ${NS}-row-odd` : ''}${row ? '' : ` ${NS}-row-loading`}`,
-      attrs: { role: 'row', 'aria-rowindex': index + 1 },
+      class: [
+        `${NS}-row`,
+        index % 2 === 1 ? `${NS}-row-odd` : '',
+        row ? '' : `${NS}-row-loading`,
+        selected ? `${NS}-row-selected` : '',
+      ].filter(Boolean).join(' '),
+      attrs: {
+        role: 'row',
+        'aria-rowindex': index + 1,
+        'aria-selected': this.isSelectionEnabled() ? String(selected) : undefined,
+      },
       style: { height: `${rowHeight}px`, transform: `translateY(${index * rowHeight}px)` },
     })
     if (!row) node.dataset.skeleton = '1'
@@ -340,6 +478,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     }
 
     if (row) {
+      if (this.isSelectionEnabled() && this.options.selectOnRowClick) {
+        node.addEventListener('click', (e) => this.applySelectionClick(row, index, e.shiftKey))
+      }
       if (this.options.onRowClick) {
         node.addEventListener('click', e => this.options.onRowClick!(row, index, e))
       }
@@ -369,6 +510,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       cell.style.zIndex = '2'
       if (column.pinned === 'start') cell.style.left = `${column.stickyOffset}px`
       else cell.style.right = `${column.stickyOffset}px`
+    }
+
+    if (column.id === SELECTION_COLUMN_ID) {
+      if (row) cell.append(this.buildRowCheckbox(row, rowIndex))
+      return cell
     }
 
     if (!row) {
@@ -407,6 +553,58 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       })
     }
     return cell
+  }
+
+  private buildRowCheckbox(row: TRow, rowIndex: number): HTMLElement {
+    const id = this.rowId(row, rowIndex)
+    return el('input', {
+      class: `${NS}-select-box`,
+      attrs: {
+        type: 'checkbox',
+        checked: this.selection.isSelected(id),
+        'aria-label': this.t.t('selectRow'),
+      },
+      on: {
+        // Sans cela, le clic remonterait à la ligne et déclencherait
+        // `onRowClick` — donc souvent une navigation.
+        click: (e: MouseEvent) => {
+          e.stopPropagation()
+          this.applySelectionClick(row, rowIndex, e.shiftKey)
+        },
+      },
+    })
+  }
+
+  /**
+   * Applique un clic de sélection. Le Maj-clic étend depuis la dernière ligne
+   * cochée, mais seulement sur les lignes chargées : on ne peut pas cocher ce
+   * qu'on n'a pas.
+   */
+  private applySelectionClick(row: TRow, rowIndex: number, extend: boolean): void {
+    const id = this.rowId(row, rowIndex)
+
+    if (this.options.rowSelection === 'single') {
+      this.selection.isSelected(id) ? this.selection.clear() : this.selection.selectOnly(id)
+      this.lastSelectedIndex = rowIndex
+      return
+    }
+
+    if (extend && this.lastSelectedIndex != null) {
+      const from = Math.min(this.lastSelectedIndex, rowIndex)
+      const to = Math.max(this.lastSelectedIndex, rowIndex)
+      const target = !this.selection.isSelected(id)
+      const ids: string[] = []
+      for (let i = from; i <= to; i++) {
+        const r = this.cache.getRow(i)
+        if (r) ids.push(this.rowId(r, i))
+      }
+      this.selection.selectRange(ids, target)
+      this.lastSelectedIndex = rowIndex
+      return
+    }
+
+    this.selection.toggle(id)
+    this.lastSelectedIndex = rowIndex
   }
 
   /** Formatage par défaut : nombres et dates suivent la locale de la grille. */
@@ -498,6 +696,25 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           },
         },
       }))
+    }
+
+    if (this.isSelectionEnabled()) {
+      const sel = this.getSelection()
+      if (!sel.isEmpty) {
+        this.statusEl.append(el('span', { class: `${NS}-status-sep` }))
+        this.statusEl.append(el('span', {
+          class: `${NS}-status-selection`,
+          text: sel.isAll && sel.count == null
+            ? this.t.t('allRowsSelected')
+            : `${this.t.number(sel.count ?? 0)} ${this.t.t('selected')}`,
+        }))
+        this.statusEl.append(el('button', {
+          class: `${NS}-btn ${NS}-btn-ghost ${NS}-btn-sm`,
+          attrs: { type: 'button' },
+          text: this.t.t('clearSelection'),
+          on: { click: () => this.deselectAll() },
+        }))
+      }
     }
   }
 
@@ -784,6 +1001,44 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private setBusy(busy: boolean): void {
     this.root.setAttribute('aria-busy', String(busy))
     this.root.classList.toggle(`${NS}-busy`, busy)
+  }
+
+  /* --- sélection --- */
+
+  getSelectedRows(): TRow[] {
+    if (!this.isSelectionEnabled()) return []
+    const out: TRow[] = []
+    const loaded = this.cache.getLoadedRows()
+    loaded.forEach((row, i) => {
+      if (this.selection.isSelected(this.rowId(row, i))) out.push(row)
+    })
+    return out
+  }
+
+  getSelection(): SelectionSnapshot {
+    return this.selection.getSnapshot(this.cache.getRowCount())
+  }
+
+  setSelection(state: SelectionState | null): void {
+    this.selection.restore(state)
+    this.onSelectionChange()
+  }
+
+  setRowSelected(rowId: string, selected: boolean): void {
+    this.selection.setSelected(rowId, selected)
+  }
+
+  isRowSelected(rowId: string): boolean {
+    return this.selection.isSelected(rowId)
+  }
+
+  selectAll(): void {
+    this.selection.selectAll()
+  }
+
+  deselectAll(): void {
+    this.selection.clear()
+    this.lastSelectedIndex = null
   }
 
   /* --- divers --- */

@@ -3,6 +3,7 @@ import type { GridContext } from './context'
 import { NS, el, onDismiss, positionFloating } from './dom'
 import { openFilterPopover } from '../filters/widgets'
 import { resolveFilterConfig } from '../filters/model'
+import { SELECTION_COLUMN_ID } from '../core/selection'
 
 /**
  * Rendu de l'en-tête : bandeaux de groupe, cellules de colonne, tri,
@@ -63,6 +64,20 @@ export class HeaderRenderer {
   private buildLeafCell(header: RenderHeader): HTMLElement {
     const column = header.column
     if (!column) return el('div', { class: `${NS}-hcell ${NS}-hcell-empty`, style: { width: `${header.width}px` } })
+
+    // La colonne de sélection ne porte ni libellé, ni tri, ni filtre, ni menu :
+    // seulement la case « tout sélectionner ».
+    if (column.id === SELECTION_COLUMN_ID) {
+      const cell = el('div', {
+        class: `${NS}-hcell ${NS}-hcell-select ${NS}-pinned-start${column.isLastPinnedStart ? ` ${NS}-pin-edge-start` : ''}`,
+        attrs: { role: 'columnheader' },
+        style: { width: `${column.width}px` },
+      })
+      this.applyStickyStyle(cell, 'start', column.stickyOffset)
+      const box = this.ctx.selectAllCheckbox?.()
+      if (box) cell.append(box)
+      return cell
+    }
 
     const def = column.def
     const t = this.ctx.t

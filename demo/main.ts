@@ -59,6 +59,16 @@ const grid = new IsoGrid<Invoice>(document.querySelector('#grid')!, {
   initialState: saved ? JSON.parse(saved) : undefined,
   onStateChange: (state) => localStorage.setItem(STATE_KEY, JSON.stringify(state)),
   export: { filename: 'factures', sheetName: 'Factures', source: 'all', maxRows: 100_000 },
+  rowSelection: 'multiple',
+  getRowId: (row) => String(row.id),
+  onSelectionChanged: (sel) => {
+    const el = document.querySelector('#selection-readout')
+    if (el) {
+      el.textContent = sel.isEmpty
+        ? 'aucune sélection'
+        : `mode ${sel.mode} · ${sel.count ?? '?'} ligne(s) · ${sel.ids.length} id(s) transmis`
+    }
+  },
   sidebar: { panels: ['columns', 'filters'], defaultOpen: false },
   toolbar: { quickFilter: true, quickFilterPlaceholder: 'Rechercher une facture…' },
   onRowClick: (row) => console.debug('[demo] ligne', row.number),

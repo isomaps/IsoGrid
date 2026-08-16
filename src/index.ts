@@ -21,6 +21,7 @@
 export { IsoGrid } from './ui/grid'
 export { builtinIconRenderer, fontAwesomeIconRenderer } from './ui/icons'
 export { ContextMenu, writeToClipboard } from './ui/context-menu'
+export { SELECTION_COLUMN_ID, SelectionModel } from './core/selection'
 export type { ContextMenuContext, ContextMenuItem, ContextMenuOptions } from './ui/context-menu'
 
 export {
@@ -41,6 +42,10 @@ export {
   BINARY_OPERATORS, DEFAULT_OPERATOR, NULLARY_OPERATORS, OPERATORS,
   applyFilters, applySort, evaluateFilter, normalizeFilter, resolveFilterConfig,
 } from './filters/model'
+
+export type {
+  HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState,
+} from './core/selection'
 
 export type {
   Align, AnyRow, BooleanOperator, CellContext, ColumnDef, ColumnFilterConfig,

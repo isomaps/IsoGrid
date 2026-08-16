@@ -894,3 +894,53 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   .isg-toast { animation: none; }
   .isg-toast-out { transition: none; }
 }
+
+/* ==========================================================================
+   Sélection de lignes
+   ========================================================================== */
+
+.isg-hcell-select,
+.isg-cell[data-col-id="__isg_select__"] {
+  padding: 0;
+  justify-content: center;
+}
+
+.isg-select-box,
+.isg-select-all-box {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--isg-accent);
+  flex: none;
+}
+
+/* La case reste discrète tant que la ligne n'est ni survolée ni cochée : sur
+   un tableau dense, une colonne de cases pleines attire l'œil avant la donnée. */
+.isg-select-box { opacity: .55; transition: opacity .12s ease; }
+.isg-row:hover .isg-select-box,
+.isg-row-selected .isg-select-box,
+.isg-select-box:focus-visible,
+.isg-select-box:checked { opacity: 1; }
+
+.isg-row-selected { background: var(--isg-accent-soft); }
+.isg-striped .isg-row-selected.isg-row-odd { background: var(--isg-accent-soft); }
+.isg-row-selected:hover { background: var(--isg-accent-soft); }
+.isg-row-selected .isg-pinned-start,
+.isg-row-selected .isg-pinned-end { background: var(--isg-accent-soft); }
+
+/* Liseré à gauche : la sélection reste lisible même quand la ligne épinglée
+   défile sous les colonnes du centre. */
+.isg-row-selected .isg-cell:first-child { box-shadow: inset 2px 0 0 0 var(--isg-accent); }
+
+.isg-status-sep {
+  width: 1px;
+  height: 13px;
+  background: var(--isg-border-strong);
+  display: inline-block;
+}
+.isg-status-selection {
+  color: var(--isg-accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

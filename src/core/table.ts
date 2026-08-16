@@ -13,6 +13,7 @@ import { renderPhaseReactivity } from '@tanstack/table-core/reactivity'
 import { batch, createAtom } from '@tanstack/store'
 
 import type { AnyRow, ColumnDef, GridState, PinPosition, SortModel } from './types'
+import { SELECTION_COLUMN_ID } from './selection'
 
 /**
  * Câblage de @tanstack/table-core.
@@ -33,8 +34,21 @@ import type { AnyRow, ColumnDef, GridState, PinPosition, SortModel } from './typ
  */
 const reactivity = renderPhaseReactivity({ createAtom, batch })
 
+/**
+ * Fonction de filtre factice.
+ *
+ * `manualFiltering: true` fait que table-core n'évalue JAMAIS de filtre : c'est
+ * la source de données qui filtre, en mémoire ou en base. Mais dès qu'une
+ * colonne porte une valeur de filtre, table-core cherche quand même à résoudre
+ * une fonction et avertit en console qu'elle n'est pas enregistrée — un
+ * message d'internals déversé dans la console de l'application hôte. On lui en
+ * fournit donc une, qui ne sera jamais appelée.
+ */
+const filterFn_delegated = () => true
+
 const features = tableFeatures({
   coreReactivityFeature: reactivity,
+  filterFns: { delegated: filterFn_delegated },
   columnVisibilityFeature,
   columnOrderingFeature,
   columnPinningFeature,
@@ -50,6 +64,8 @@ type CoreHeader = ReturnType<TableInstance['getHeaderGroups']>[number]['headers'
 
 export interface ColumnModelOptions {
   columns: ColumnDef[]
+  /** Ajoute la colonne de cases à cocher en tête, épinglée et verrouillée. */
+  selectionColumn?: { width: number } | false
   defaultColumn?: Partial<ColumnDef>
   defaultColumnWidth: number
   initialState?: Partial<GridState>
@@ -107,6 +123,27 @@ export class ColumnModel {
     return { ...this.opts.defaultColumn, ...def }
   }
 
+  /** Définition synthétique de la colonne de sélection. */
+  private selectionDef(): ColumnDef | null {
+    const cfg = this.opts.selectionColumn
+    if (!cfg) return null
+    return {
+      id: SELECTION_COLUMN_ID,
+      header: '',
+      width: cfg.width,
+      minWidth: cfg.width,
+      maxWidth: cfg.width,
+      pinned: 'start',
+      sortable: false,
+      resizable: false,
+      filter: false,
+      lockVisible: true,
+      lockPosition: true,
+      align: 'center',
+      excludeFromExport: true,
+    }
+  }
+
   /**
    * Convertit nos `ColumnDef` en colonnes table-core, en reconstituant les
    * groupes d'en-tête à partir de `group`. Les colonnes d'un même groupe non
@@ -117,6 +154,23 @@ export class ColumnModel {
     const out: unknown[] = []
     let currentGroup: string | null = null
     let bucket: unknown[] | null = null
+
+    const selection = this.selectionDef()
+    if (selection) {
+      out.push({
+        id: selection.id,
+        accessorKey: selection.id,
+        header: '',
+        size: selection.width,
+        minSize: selection.minWidth,
+        maxSize: selection.maxWidth,
+        enableSorting: false,
+        enableResizing: false,
+        enableHiding: false,
+        enablePinning: true,
+        filterFn: 'delegated' as const,
+      })
+    }
 
     for (const raw of this.orderedDefs) {
       const def = this.mergedDef(raw)
@@ -131,6 +185,7 @@ export class ColumnModel {
         enableResizing: def.resizable !== false,
         enableHiding: def.lockVisible !== true,
         enablePinning: true,
+        filterFn: 'delegated' as const,
       }
 
       if (def.group) {
@@ -157,6 +212,9 @@ export class ColumnModel {
     const pinEnd: string[] = []
     const sizing: Record<string, number> = {}
 
+    const selection = this.selectionDef()
+    if (selection) pinStart.push(selection.id)
+
     // Les indications portées par les colonnes forment la base…
     for (const raw of this.orderedDefs) {
       const def = this.mergedDef(raw)
@@ -166,9 +224,20 @@ export class ColumnModel {
     }
 
     // …et l'état restauré (préférences utilisateur) les écrase entièrement.
+    // Un état restauré d'une session antérieure peut ignorer la colonne de
+    // sélection : on la réinjecte toujours en tête des colonnes épinglées.
+    const restoredPinning = init.columnPinning
+      ? {
+          start: selection && !init.columnPinning.start.includes(selection.id)
+            ? [selection.id, ...init.columnPinning.start]
+            : init.columnPinning.start,
+          end: init.columnPinning.end,
+        }
+      : { start: pinStart, end: pinEnd }
+
     return {
       columnVisibility: init.columnVisibility ?? visibility,
-      columnPinning: init.columnPinning ?? { start: pinStart, end: pinEnd },
+      columnPinning: restoredPinning,
       columnOrder: init.columnOrder ?? [],
       columnSizing: init.columnSizing ?? sizing,
       sorting: init.sort ?? [],
@@ -177,6 +246,8 @@ export class ColumnModel {
   }
 
   private build(): TableInstance {
+    const selection = this.selectionDef()
+    if (selection) this.defs.set(selection.id, selection)
     for (const def of this.orderedDefs) this.defs.set(def.id, this.mergedDef(def))
 
     const table = constructTable({
@@ -235,6 +306,7 @@ export class ColumnModel {
     return this.defs.get(id)
   }
 
+  /** Défs métier, colonne de sélection exclue. */
   getAllDefs(): ColumnDef[] {
     return this.orderedDefs.map(d => this.mergedDef(d))
   }

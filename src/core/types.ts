@@ -7,6 +7,10 @@
  * remplaçable, pas une partie de l'API.
  */
 
+import type { SelectionSnapshot, SelectionState } from './selection'
+
+export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState } from './selection'
+
 /* ------------------------------------------------------------------------ */
 /* Colonnes                                                                  */
 /* ------------------------------------------------------------------------ */
@@ -232,7 +236,8 @@ export interface Datasource<TRow = AnyRow> {
 /* Options                                                                   */
 /* ------------------------------------------------------------------------ */
 
-export type LocaleCode = 'fr' | 'en' | 'de' | 'es' | 'it'
+/** Langues fournies avec la bibliothèque, catalogues complets. */
+export type LocaleCode = 'fr' | 'en' | 'de' | 'es' | 'it' | 'nl' | 'pl' | 'ru'
 
 export type ThemeMode = 'light' | 'dark' | 'auto'
 
@@ -334,6 +339,31 @@ export interface IsoGridOptions<TRow = AnyRow> {
   /** Réglages appliqués à toutes les colonnes, écrasés par la colonne elle-même. */
   defaultColumn?: Partial<ColumnDef<TRow>>
 
+  /**
+   * Sélection de lignes par cases à cocher.
+   *
+   * `multiple` ajoute une colonne de cases épinglée à gauche, avec une case
+   * d'en-tête « tout sélectionner ». `single` sélectionne une seule ligne à la
+   * fois. Défaut : `false`.
+   *
+   * ⚠️ En mode serveur, fournir un `getRowId` STABLE (une clé métier, pas
+   * l'index) : l'index d'une ligne change dès qu'on retrie, ce qui ferait
+   * porter la sélection sur d'autres lignes.
+   */
+  rowSelection?: false | 'single' | 'multiple'
+
+  /** Largeur de la colonne de cases à cocher. Défaut : 44. */
+  selectionColumnWidth?: number
+
+  /**
+   * Sélectionner la ligne au clic n'importe où, pas seulement sur la case.
+   * Défaut : false — sinon un clic destiné à ouvrir la fiche sélectionne.
+   */
+  selectOnRowClick?: boolean
+
+  /** Appelé à chaque changement de sélection. */
+  onSelectionChanged?: (selection: SelectionSnapshot, grid: IsoGridApi<TRow>) => void
+
   sidebar?: false | SidebarOptions
   toolbar?: false | ToolbarOptions
   /**
@@ -426,6 +456,22 @@ export interface IsoGridApi<TRow = AnyRow> {
   /* --- export --- */
   exportExcel(options?: ExportOptions & { onProgress?: (p: ExportProgress) => void }): Promise<void>
   exportCsv(options?: ExportOptions & { onProgress?: (p: ExportProgress) => void }): Promise<void>
+
+  /* --- sélection --- */
+  /** Lignes sélectionnées ET actuellement chargées. Voir `getSelection()`. */
+  getSelectedRows(): TRow[]
+  /**
+   * État complet et sérialisable de la sélection — c'est ce qu'une action de
+   * masse doit envoyer au serveur. En mode `exclude`, il désigne des lignes
+   * que le navigateur n'a jamais chargées.
+   */
+  getSelection(): SelectionSnapshot
+  setSelection(state: SelectionState | null): void
+  setRowSelected(rowId: string, selected: boolean): void
+  isRowSelected(rowId: string): boolean
+  /** Sélectionne tout le jeu filtré, lignes non chargées comprises. */
+  selectAll(): void
+  deselectAll(): void
 
   /* --- divers --- */
   setLocale(locale: LocaleCode): void

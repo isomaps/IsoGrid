@@ -170,9 +170,60 @@ Clair/sombre automatique (`prefers-color-scheme`), forçable via
 
 ## Langues
 
-`fr`, `en`, `de`, `es`, `it` — les cinq langues IsoMaps, complètes dès la
-première version. Une clé absente d'une langue est un bug, pas un « à
+**8 langues complètes** : `fr`, `en`, `de`, `es`, `it`, `nl`, `pl`, `ru` —
+81 clés chacune. Une clé absente d'une langue est un bug, pas un « à
 compléter ». `messages` permet de surcharger n'importe quel libellé.
+
+## Sélection de lignes
+
+```ts
+new IsoGrid(el, {
+  rowSelection: 'multiple',          // ou 'single', ou false (défaut)
+  getRowId: (row) => String(row.id), // OBLIGATOIRE en mode serveur
+  onSelectionChanged: (sel) => console.log(sel.count),
+})
+```
+
+Une colonne de cases apparaît en tête, épinglée et verrouillée. La case
+d'en-tête est à trois états (aucune / partielle / toutes), le Maj-clic étend
+la sélection depuis la dernière ligne cochée, et la barre d'état affiche le
+compte avec un bouton pour tout désélectionner.
+
+### Le point difficile : « tout sélectionner » sur 50 000 lignes
+
+Quand la grille n'a chargé que 100 lignes sur 50 000, cocher « tout
+sélectionner » ne peut pas énumérer des identifiants jamais vus. La sélection
+a donc **deux modes symétriques** :
+
+```ts
+{ mode: 'include', ids: ['12', '47'] }   // seules ces lignes
+{ mode: 'exclude', ids: ['12'] }         // TOUT le jeu filtré, sauf celle-ci
+```
+
+`selectAll()` bascule en `exclude` avec une liste vide : 50 000 lignes
+sélectionnées, **zéro identifiant transmis, aucune ligne chargée**. Décocher
+ensuite trois lignes ajoute trois identifiants à la liste d'exclusion.
+
+`getSelection()` renvoie cet état tel quel — c'est exactement ce qu'une action
+de masse doit poster au serveur, à charge pour lui de retraduire `exclude` en
+« la requête filtrée courante, moins ces identifiants ».
+
+```ts
+grid.getSelectedRows()   // lignes sélectionnées ET chargées
+grid.getSelection()      // état complet, sérialisable, + count / isAll / isEmpty
+grid.setSelection(state) / setRowSelected(id, bool) / isRowSelected(id)
+grid.selectAll() / deselectAll()
+```
+
+### Ce qui efface la sélection, et ce qui ne l'efface pas
+
+Un **tri** la conserve : l'ensemble des lignes ne change pas, seulement leur
+ordre. Un **changement de filtre** l'efface : en mode `exclude`, « tout sauf
+ces trois-là » désignerait sinon silencieusement d'autres lignes.
+
+> ⚠️ En mode serveur, fournir un `getRowId` **stable** (une clé métier). À
+> défaut, la sélection retombe sur l'index de ligne, qui change à chaque tri —
+> la grille émet un avertissement en console dans ce cas.
 
 ## Menu contextuel (clic droit)
 

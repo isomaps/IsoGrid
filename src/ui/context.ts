@@ -30,4 +30,10 @@ export interface GridContext {
 
   /** Valeurs distinctes d'une colonne, pour un filtre `set`. */
   fetchSetValues(columnId: string): Promise<SetFilterOption[]>
+
+  /**
+   * Fabrique la case « tout sélectionner » de l'en-tête. Absent quand la
+   * sélection multiple n'est pas active.
+   */
+  selectAllCheckbox?: () => HTMLElement
 }
