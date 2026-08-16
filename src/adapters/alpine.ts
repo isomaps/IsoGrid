@@ -79,6 +79,24 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
         options.datasource = cfg.source
       }
 
+      // Un renderer déclaré depuis Blade ne peut être qu'une CHAÎNE : PHP ne
+      // sérialise pas de fonction. On la résout en fonction globale, et on
+      // lui passe `$wire` en second argument — c'est ce qui permet à un
+      // panneau de détail d'appeler une méthode du composant Livewire porteur
+      // sans qu'on ait à déclarer une route.
+      const md = cfg.masterDetail as (typeof cfg.masterDetail & { renderer: unknown }) | undefined
+      if (md && typeof md.renderer === 'string') {
+        const name = md.renderer
+        const fn = (window as unknown as Record<string, unknown>)[name]
+        if (typeof fn !== 'function') {
+          throw new Error(`IsoGrid: le renderer de détail « ${name} » est introuvable sur window.`)
+        }
+        options.masterDetail = {
+          ...md,
+          renderer: (ctx) => (fn as (c: unknown, w: unknown) => Node | string)(ctx, this.$wire),
+        }
+      }
+
       if (cfg.excelJsUrl) {
         options.export = {
           ...cfg.export,
