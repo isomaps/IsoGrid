@@ -592,12 +592,6 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   cursor: pointer;
 }
 .isg-column-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.isg-column-pins { display: flex; gap: 1px; opacity: .4; transition: opacity .12s ease; }
-.isg-column-row:hover .isg-column-pins,
-.isg-column-row:focus-within .isg-column-pins { opacity: 1; }
-.isg-pin-btn.isg-active { opacity: 1; color: var(--isg-accent); }
-.isg-column-row:has(.isg-pin-btn.isg-active) .isg-column-pins { opacity: 1; }
-.isg-pin-btn[title]:last-child .isg-icon { transform: scaleX(-1); }
 
 /* --- Panneau filtres --- */
 

@@ -168,10 +168,6 @@ export class Sidebar {
 
   private buildColumnRow(def: ColumnDef, isVisible: boolean): HTMLElement {
     const t = this.ctx.t
-    const pinned = this.ctx.columns.getState().columnPinning
-    const pinPosition = pinned.start.includes(def.id) ? 'start'
-      : pinned.end.includes(def.id) ? 'end'
-        : false
 
     // La ligne n'est PAS `draggable` d'emblée : elle le devient le temps d'une
     // prise sur la poignée. Sinon le moindre glissement depuis le libellé ou la
@@ -211,26 +207,11 @@ export class Sidebar {
       ],
     }))
 
-    const pinButton = (position: 'start' | 'end', icon: 'pin-start' | 'pin-end', label: string) =>
-      el('button', {
-        class: `${NS}-icon-btn ${NS}-pin-btn${pinPosition === position ? ` ${NS}-active` : ''}`,
-        attrs: { type: 'button', title: label, 'aria-label': label, 'aria-pressed': pinPosition === position },
-        children: [this.ctx.icon(icon)],
-        on: {
-          click: () => {
-            this.ctx.columns.pinColumn(def.id, pinPosition === position ? false : position)
-            this.ctx.emitState()
-          },
-        },
-      })
-
-    row.append(el('div', {
-      class: `${NS}-column-pins`,
-      children: [
-        pinButton('start', 'pin-start', t.t('pinStart')),
-        pinButton('end', 'pin-end', t.t('pinEnd')),
-      ],
-    }))
+    // L'épinglage n'est PAS proposé ici : il vit dans le menu de chaque
+    // colonne, où il est au contact de la colonne concernée. Deux boutons par
+    // ligne encombraient le panneau, et leurs deux glyphes se ressemblaient
+    // assez pour être pris pour des flèches de déplacement — juste à côté de
+    // la poignée qui, elle, déplace vraiment.
 
     if (!def.lockPosition) this.wireRowDrag(row, def.id)
     return row
