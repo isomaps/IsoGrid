@@ -311,6 +311,23 @@ d'en-tête est à trois états (aucune / partielle / toutes), le Maj-clic étend
 la sélection depuis la dernière ligne cochée, et la barre d'état affiche le
 compte avec un bouton pour tout désélectionner.
 
+### Sélectionner sans colonne de cases
+
+```ts
+new IsoGrid(el, { rowSelection: 'multiple', selectionColumn: false })
+```
+
+La colonne disparaît, la sélection reste : elle se fait au clic sur la ligne,
+et `selectOnRowClick` s'active de lui-même. Cette bascule est délibérée —
+sans elle, retirer la colonne rendrait la sélection inatteignable, donc les
+actions de masse inertes, et rien ne le signalerait.
+
+Ce qu'on perd en échange : la case « tout sélectionner » de l'en-tête. Le
+mode `exclude` ne s'obtient alors plus que par `selectAll()`.
+
+⚠️ À ne pas combiner avec `onRowClick` s'il navigue : le même clic
+sélectionnerait et quitterait la page.
+
 ### Le point difficile : « tout sélectionner » sur 50 000 lignes
 
 Quand la grille n'a chargé que 100 lignes sur 50 000, cocher « tout
