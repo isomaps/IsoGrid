@@ -86,7 +86,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     this.columnModel = new ColumnModel({
       columns: options.columns as ColumnDef[],
-      selectionColumn: options.rowSelection === 'multiple'
+      selectionColumn: options.rowSelection === 'multiple' && options.selectionColumn !== false
         ? { width: options.selectionColumnWidth ?? DEFAULTS.selectionColumnWidth }
         : false,
       groupColumn: this.grouping.isActive()
@@ -448,6 +448,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return id != null ? String(id) : String(index)
   }
 
+  /**
+   * Le clic sur la ligne sélectionne-t-il ?
+   *
+   * Oui si l'hôte l'a demandé, et TOUJOURS quand la colonne de cases est
+   * retirée : c'est alors le seul moyen de sélectionner.
+   */
+  private selectionParLigne(): boolean {
+    return this.options.selectOnRowClick === true || this.options.selectionColumn === false
+  }
+
   private isSelectionEnabled(): boolean {
     return this.options.rowSelection === 'single' || this.options.rowSelection === 'multiple'
   }
@@ -781,7 +791,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     }
 
     if (row) {
-      if (this.isSelectionEnabled() && this.options.selectOnRowClick) {
+      if (this.isSelectionEnabled() && this.selectionParLigne()) {
         node.addEventListener('click', (e) => this.applySelectionClick(row, index, e.shiftKey))
       }
       if (this.options.onRowClick) {

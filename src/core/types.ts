@@ -377,6 +377,20 @@ export interface IsoGridOptions<TRow = AnyRow> {
   selectionColumnWidth?: number
 
   /**
+   * Afficher la colonne de cases à cocher. Défaut : `true`.
+   *
+   * La passer à `false` retire la colonne SANS retirer la sélection : celle-ci
+   * se fait alors au clic sur la ligne, et `selectOnRowClick` s'active de
+   * lui-même. Sans cette bascule automatique, supprimer la colonne rendrait la
+   * sélection inatteignable — donc les actions de masse inertes, et sans rien
+   * pour le signaler.
+   *
+   * Contrepartie assumée : on perd la case « tout sélectionner » de l'en-tête,
+   * donc le mode « tout sauf » ne s'obtient plus qu'en appelant `selectAll()`.
+   */
+  selectionColumn?: boolean
+
+  /**
    * Sélectionner la ligne au clic n'importe où, pas seulement sur la case.
    * Défaut : false — sinon un clic destiné à ouvrir la fiche sélectionne.
    */
