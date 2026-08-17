@@ -75,7 +75,10 @@ const PATHS: Record<IconName, string | IconSpec> = {
   'chevron-right': 'M6 3.5 10.5 8 6 12.5',
   'eye': 'M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM9.75 8a1.75 1.75 0 1 1-3.5 0 1.75 1.75 0 0 1 3.5 0z',
   'eye-off': 'M6.4 4a5.9 5.9 0 0 1 1.6-.2c4 0 6.5 4.2 6.5 4.2a12 12 0 0 1-2 2.5M3.8 5.3A12 12 0 0 0 1.5 8S4 12.2 8 12.2c.9 0 1.7-.2 2.4-.5M2 2l12 12',
-  'grip': 'M6 4h.01M10 4h.01M6 8h.01M10 8h.01M6 12h.01M10 12h.01',
+  // Trois colonnes de trois points : la poignée de glisser universelle. Deux
+  // colonnes se lisaient mal à petite taille et ne se distinguaient pas du
+  // menu « ⋮ » voisin.
+  'grip': 'M4 4h.01M8 4h.01M12 4h.01M4 8h.01M8 8h.01M12 8h.01M4 12h.01M8 12h.01M12 12h.01',
   'spinner': 'M8 1.75a6.25 6.25 0 1 0 6.25 6.25',
   'warning': 'M8 2.5 1.75 13.5h12.5zM8 6.5v3.2M8 11.6h.01',
 }

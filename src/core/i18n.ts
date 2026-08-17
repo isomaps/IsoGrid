@@ -10,7 +10,7 @@ export type MessageKey =
   | 'rows' | 'rowsFiltered' | 'of' | 'selected'
   | 'columns' | 'filters' | 'sidebar' | 'closeSidebar'
   | 'showAll' | 'hideAll' | 'searchColumns' | 'noColumnMatch'
-  | 'pinStart' | 'pinEnd' | 'unpin' | 'pinned'
+  | 'pinStart' | 'pinEnd' | 'unpin' | 'pinned' | 'reorderColumn'
   | 'sortAsc' | 'sortDesc' | 'clearSort' | 'autoSize' | 'hideColumn'
   | 'filterBy' | 'clearFilter' | 'clearAllFilters' | 'applyFilter' | 'noFilterActive'
   | 'and' | 'or' | 'addCondition' | 'removeCondition'
@@ -60,6 +60,7 @@ const fr: Catalog = {
   searchColumns: 'Filtrer les colonnes…',
   noColumnMatch: 'Aucune colonne ne correspond',
   pinStart: 'Épingler à gauche',
+  reorderColumn: 'Glisser pour réordonner',
   pinEnd: 'Épingler à droite',
   unpin: 'Détacher',
   pinned: 'Épinglée',
@@ -153,6 +154,7 @@ const en: Catalog = {
   searchColumns: 'Filter columns…',
   noColumnMatch: 'No matching column',
   pinStart: 'Pin left',
+  reorderColumn: 'Drag to reorder',
   pinEnd: 'Pin right',
   unpin: 'Unpin',
   pinned: 'Pinned',
@@ -246,6 +248,7 @@ const de: Catalog = {
   searchColumns: 'Spalten filtern…',
   noColumnMatch: 'Keine passende Spalte',
   pinStart: 'Links anheften',
+  reorderColumn: 'Zum Umsortieren ziehen',
   pinEnd: 'Rechts anheften',
   unpin: 'Lösen',
   pinned: 'Angeheftet',
@@ -339,6 +342,7 @@ const es: Catalog = {
   searchColumns: 'Filtrar columnas…',
   noColumnMatch: 'Ninguna columna coincide',
   pinStart: 'Fijar a la izquierda',
+  reorderColumn: 'Arrastrar para reordenar',
   pinEnd: 'Fijar a la derecha',
   unpin: 'Soltar',
   pinned: 'Fijada',
@@ -432,6 +436,7 @@ const it: Catalog = {
   searchColumns: 'Filtra le colonne…',
   noColumnMatch: 'Nessuna colonna corrispondente',
   pinStart: 'Blocca a sinistra',
+  reorderColumn: 'Trascina per riordinare',
   pinEnd: 'Blocca a destra',
   unpin: 'Sblocca',
   pinned: 'Bloccata',
@@ -525,6 +530,7 @@ const nl: Catalog = {
   searchColumns: 'Kolommen filteren…',
   noColumnMatch: 'Geen overeenkomende kolom',
   pinStart: 'Links vastzetten',
+  reorderColumn: 'Sleep om te herordenen',
   pinEnd: 'Rechts vastzetten',
   unpin: 'Losmaken',
   pinned: 'Vastgezet',
@@ -618,6 +624,7 @@ const pl: Catalog = {
   searchColumns: 'Filtruj kolumny…',
   noColumnMatch: 'Brak pasującej kolumny',
   pinStart: 'Przypnij do lewej',
+  reorderColumn: 'Przeciągnij, aby zmienić kolejność',
   pinEnd: 'Przypnij do prawej',
   unpin: 'Odepnij',
   pinned: 'Przypięta',
@@ -711,6 +718,7 @@ const ru: Catalog = {
   searchColumns: 'Фильтровать столбцы…',
   noColumnMatch: 'Подходящих столбцов нет',
   pinStart: 'Закрепить слева',
+  reorderColumn: 'Перетащите, чтобы изменить порядок',
   pinEnd: 'Закрепить справа',
   unpin: 'Открепить',
   pinned: 'Закреплён',

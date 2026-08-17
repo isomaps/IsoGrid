@@ -569,7 +569,20 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-column-row.isg-drop-before { box-shadow: inset 0 2px 0 0 var(--isg-accent); }
 .isg-column-row.isg-drop-after { box-shadow: inset 0 -2px 0 0 var(--isg-accent); }
 
-.isg-column-grip { color: var(--isg-border-strong); font-size: 11px; cursor: grab; }
+/* La poignée EST l'affordance du réordonnancement : trop pâle, personne ne
+   découvre qu'on peut glisser. */
+.isg-column-grip {
+  color: var(--isg-fg-muted);
+  font-size: 13px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--isg-radius);
+  flex: none;
+}
+.isg-column-grip:hover { color: var(--isg-fg); background: var(--isg-bg-hover); }
+.isg-column-grip:active { cursor: grabbing; }
 .isg-column-toggle {
   display: flex;
   align-items: center;

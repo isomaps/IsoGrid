@@ -173,12 +173,28 @@ export class Sidebar {
       : pinned.end.includes(def.id) ? 'end'
         : false
 
+    // La ligne n'est PAS `draggable` d'emblée : elle le devient le temps d'une
+    // prise sur la poignée. Sinon le moindre glissement depuis le libellé ou la
+    // case démarrait un déplacement, et sélectionner le texte devenait
+    // impossible.
     const row = el('div', {
       class: `${NS}-column-row`,
-      attrs: { 'data-col-id': def.id, draggable: def.lockPosition ? 'false' : 'true' },
+      attrs: { 'data-col-id': def.id, draggable: 'false' },
     })
 
-    row.append(el('span', { class: `${NS}-column-grip`, children: [this.ctx.icon('grip')] }))
+    const grip = el('span', {
+      class: `${NS}-column-grip`,
+      attrs: { title: t.t('reorderColumn'), 'aria-hidden': 'true' },
+      children: [this.ctx.icon('grip')],
+    })
+    if (!def.lockPosition) {
+      grip.addEventListener('pointerdown', () => { row.draggable = true })
+      // On rend la ligne inerte dès que la prise se relâche, y compris quand le
+      // glisser n'a jamais commencé.
+      grip.addEventListener('pointerup', () => { row.draggable = false })
+      row.addEventListener('dragend', () => { row.draggable = false })
+    }
+    row.append(grip)
 
     row.append(el('label', {
       class: `${NS}-column-toggle`,
