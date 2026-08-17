@@ -65,7 +65,10 @@ export class Toolbar {
       }))
     }
 
-    if (this.options.exportButton !== false) {
+    // Opt-IN et non opt-out : l'export vit dans le menu du clic droit, aux
+    // côtés des copies. Un second point d'entrée dans la barre d'outils la
+    // charge sans rien ajouter.
+    if (this.options.exportButton === true) {
       this.right.append(el('button', {
         class: `${NS}-btn`,
         attrs: { type: 'button', 'aria-haspopup': 'menu' },

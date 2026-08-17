@@ -283,6 +283,13 @@ export interface SidebarOptions {
 export interface ToolbarOptions {
   quickFilter?: boolean
   quickFilterPlaceholder?: string
+  /**
+   * Bouton « Exporter » dans la barre d'outils. Défaut : `false`.
+   *
+   * L'export est toujours accessible au clic droit sur une ligne, à côté des
+   * copies. Ce bouton n'est qu'un second point d'entrée : le passer à `true`
+   * quand l'export est une fonction attendue et qu'il faut la rendre visible.
+   */
   exportButton?: boolean
   /** Bouton ouvrant le panneau « Filtres », avec le compteur de filtres actifs. */
   filtersButton?: boolean

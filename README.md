@@ -140,6 +140,15 @@ ExcelJS est une `peerDependency` **optionnelle**, chargée dynamiquement au
 clic : elle ne pèse rien tant qu'on n'exporte pas. Le CSV, lui, n'a aucune
 dépendance (et neutralise l'injection de formule).
 
+L'export s'atteint par le **clic droit** sur n'importe quelle ligne, aux côtés
+des copies. Le bouton « Exporter » de la barre d'outils est **désactivé par
+défaut** — c'est un second point d'entrée, à rallumer quand l'export doit être
+visible :
+
+```ts
+new IsoGrid(el, { toolbar: { exportButton: true } })
+```
+
 ## API
 
 ```ts
