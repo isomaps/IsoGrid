@@ -173,6 +173,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       attrs: { role: 'grid', 'aria-busy': 'false' },
     })
     if (this.options.stripedRows !== false) root.classList.add(`${NS}-striped`)
+    if (this.options.borderless) root.classList.add(`${NS}-borderless`)
+    if (this.options.showHeader === false) root.classList.add(`${NS}-headerless`)
 
     if (this.options.toolbar !== false) {
       this.toolbar = new Toolbar(

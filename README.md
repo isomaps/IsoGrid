@@ -177,6 +177,27 @@ Tout passe par des variables CSS sur `.isg-root` :
 Clair/sombre automatique (`prefers-color-scheme`), forçable via
 `theme: 'light' | 'dark' | 'auto'`.
 
+## Variantes d'intégration
+
+```ts
+new IsoGrid(el, { borderless: true, showHeader: false, rowHeight: 120 })
+```
+
+`borderless` retire le contour extérieur et les coins arrondis — utile quand
+le conteneur hôte porte déjà son cadre, deux contours imbriqués faisant sale.
+
+`showHeader: false` masque la ligne d'en-tête et donne une **liste de fiches**
+plutôt qu'un tableau. ⚠️ L'en-tête porte le tri, les filtres de colonne, le
+menu de colonne et la poignée de redimensionnement : sans lui, tout cela
+devient inatteignable à la souris. À réserver aux vues en lecture seule.
+
+Les deux options sont **indépendantes** : un cadre et un en-tête ne sont pas
+la même chose, et les fusionner sous un seul nom rendrait l'un des deux effets
+invisible à la lecture du code appelant.
+
+Ne pas obtenir le second par `headerHeight: 0` : la ligne serait réduite à
+zéro mais ses filets haut et bas resteraient, soit un double trait gris.
+
 ## Langues
 
 **8 langues complètes** : `fr`, `en`, `de`, `es`, `it`, `nl`, `pl`, `ru` —

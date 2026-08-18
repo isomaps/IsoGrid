@@ -62,6 +62,21 @@
   box-sizing: border-box;
 }
 
+/* --- Variantes d'intégration -------------------------------------------- */
+
+/* Posée dans un conteneur qui porte déjà son cadre : deux contours imbriqués
+   font sale. */
+.isg-root.isg-borderless {
+  border: none;
+  border-radius: 0;
+}
+
+/* Liste de fiches plutôt que tableau. On masque la LIGNE d'en-tête, pas sa
+   hauteur : un `headerHeight: 0` la réduirait à zéro tout en gardant les
+   `border-top` et `border-bottom` de `.isg-header-row`, soit un double filet
+   gris en haut de la grille. */
+.isg-root.isg-headerless .isg-header { display: none; }
+
 .isg-root *,
 .isg-root *::before,
 .isg-root *::after { box-sizing: border-box; }

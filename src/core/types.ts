@@ -380,6 +380,27 @@ export interface IsoGridOptions<TRow = AnyRow> {
    */
   rowSelection?: false | 'single' | 'multiple'
 
+  /**
+   * Retire le contour extérieur et les coins arrondis. Défaut : `false`.
+   *
+   * Pour une grille posée dans un conteneur qui porte déjà son propre cadre —
+   * une carte, un panneau — deux contours imbriqués font sale.
+   */
+  borderless?: boolean
+
+  /**
+   * Afficher la ligne d'en-tête. Défaut : `true`.
+   *
+   * La masquer donne une liste de fiches plutôt qu'un tableau. ⚠️ L'en-tête
+   * porte le tri, les filtres de colonne, le menu de colonne et la poignée de
+   * redimensionnement : sans lui, tout cela devient inatteignable à la souris.
+   * À réserver aux vues en lecture seule.
+   *
+   * On masque la LIGNE et non sa hauteur : un `headerHeight: 0` laisserait les
+   * filets haut et bas de `.isg-header-row`, soit un double trait gris.
+   */
+  showHeader?: boolean
+
   /** Largeur de la colonne de cases à cocher. Défaut : 44. */
   selectionColumnWidth?: number
 
