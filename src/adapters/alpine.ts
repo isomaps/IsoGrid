@@ -126,7 +126,7 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
       // une page Blade de renvoyer la sélection courante vers son composant
       // Livewire — donc d'y brancher des actions de masse — sans écrire de
       // JavaScript applicatif.
-      const rappels = ['onSelectionChanged', 'onStateChange', 'onError'] as const
+      const rappels = ['onSelectionChanged', 'onStateChange', 'onError', 'onRowClick', 'onRowDoubleClick'] as const
       for (const cle of rappels) {
         const brut = (cfg as unknown as Record<string, unknown>)[cle]
         if (typeof brut !== 'string') continue

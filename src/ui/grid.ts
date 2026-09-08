@@ -797,6 +797,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         node.addEventListener('click', (e) => this.applySelectionClick(row, index, e.shiftKey))
       }
       if (this.options.onRowClick) {
+        node.style.cursor = 'pointer'
         node.addEventListener('click', e => this.options.onRowClick!(row, index, e))
       }
       if (this.options.onRowDoubleClick) {
