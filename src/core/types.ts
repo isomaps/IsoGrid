@@ -364,6 +364,18 @@ export interface IsoGridOptions<TRow = AnyRow> {
 
   /** Largeur par défaut d'une colonne sans `width`. Défaut : 160. */
   defaultColumnWidth?: number
+  /**
+   * Étire les colonnes pour occuper toute la largeur de la grille quand leur
+   * somme est plus petite. Défaut : `true`.
+   *
+   * L'espace restant est réparti au RENDU seulement : rien n'est écrit dans
+   * l'état (`columnSizing`), donc rien n'est persisté, et la même grille se
+   * recalcule d'elle-même quand la fenêtre change de taille. S'étirent les
+   * colonnes non épinglées, redimensionnables et que l'utilisateur n'a pas
+   * redimensionnées — au prorata de `flex` si au moins une colonne le déclare,
+   * sinon au prorata de leur largeur. `maxWidth` est respecté.
+   */
+  fillWidth?: boolean
   /** Réglages appliqués à toutes les colonnes, écrasés par la colonne elle-même. */
   defaultColumn?: Partial<ColumnDef<TRow>>
 

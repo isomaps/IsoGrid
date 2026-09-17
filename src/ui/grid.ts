@@ -101,6 +101,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         : false,
       defaultColumn: options.defaultColumn as Partial<ColumnDef>,
       defaultColumnWidth: options.defaultColumnWidth ?? DEFAULTS.defaultColumnWidth,
+      fillWidth: options.fillWidth !== false,
       initialState: options.initialState,
       onChange: () => this.onColumnModelChange(),
     })
@@ -145,8 +146,14 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.lastDataSignature = this.dataSignature()
     this.lastFilterSignature = this.filterSignature()
     this.applyTheme(options.theme ?? 'auto')
+    this.columnModel.setAvailableWidth(this.usableWidth())
     this.render()
     this.refreshVisibleRange()
+  }
+
+  /** Largeur utile pour les colonnes — même marge que `sizeColumnsToFit()`. */
+  private usableWidth(): number {
+    return this.viewport ? Math.max(0, this.viewport.clientWidth - 2) : 0
   }
 
   /* -------------------------------------------------------------------- */
@@ -220,8 +227,17 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     // Le nombre de lignes visibles dépend de la hauteur du conteneur : sans
     // observation, un panneau qui s'ouvre laisse des trous dans le corps.
+    // La LARGEUR aussi compte désormais : les colonnes s'étirent sur l'espace
+    // disponible (option `fillWidth`) — y compris quand la grille était masquée
+    // à la construction et devient visible.
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => this.refreshVisibleRange())
+      this.resizeObserver = new ResizeObserver(() => {
+        if (this.columnModel.setAvailableWidth(this.usableWidth())) {
+          this.headerRenderer.render()
+          this.applyColumnGeometry()
+        }
+        this.refreshVisibleRange()
+      })
       this.resizeObserver.observe(this.viewport)
     }
     return root
@@ -1372,7 +1388,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   /** Répartit la largeur disponible entre les colonnes visibles. */
   sizeColumnsToFit(): void {
-    const available = this.viewport.clientWidth - 2
+    const available = this.usableWidth()
     const columns = this.columnModel.getRenderColumns()
     if (columns.length === 0 || available <= 0) return
 

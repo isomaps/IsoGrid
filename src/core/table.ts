@@ -78,6 +78,8 @@ export interface ColumnModelOptions {
   groupedColumnIds?: string[]
   defaultColumn?: Partial<ColumnDef>
   defaultColumnWidth: number
+  /** Voir `IsoGridOptions.fillWidth`. */
+  fillWidth?: boolean
   initialState?: Partial<GridState>
   onChange: () => void
 }
@@ -114,6 +116,8 @@ export interface RenderHeader {
 export class ColumnModel {
   private table: TableInstance
   private defs = new Map<string, ColumnDef>()
+  /** Largeur utile du viewport, fournie par la grille. 0 tant qu'elle est inconnue. */
+  private availableWidth = 0
   private orderedDefs: ColumnDef[]
   private quickFilterValue: string
   private opts: ColumnModelOptions
@@ -498,11 +502,85 @@ export class ColumnModel {
     const lastStart = start.length ? start[start.length - 1].id : undefined
     const firstEnd = end.length ? end[0].id : undefined
 
-    return [
+    const columns = [
       ...start.map(c => this.toRenderColumn(c, 'start', lastStart, firstEnd)),
       ...center.map(c => this.toRenderColumn(c, false, lastStart, firstEnd)),
       ...end.map(c => this.toRenderColumn(c, 'end', lastStart, firstEnd)),
     ]
+    this.stretchToAvailableWidth(columns)
+    return columns
+  }
+
+  /**
+   * Largeur utile du viewport. Renvoie vrai si elle a changé : la grille doit
+   * alors réappliquer la géométrie des colonnes.
+   */
+  setAvailableWidth(width: number): boolean {
+    const next = Math.max(0, Math.floor(width))
+    if (next === this.availableWidth) return false
+    this.availableWidth = next
+    return true
+  }
+
+  /**
+   * Répartit l'espace restant entre les colonnes extensibles.
+   *
+   * Sans cela, des colonnes à largeur fixe laissaient une bande vide à droite
+   * dès que l'écran était assez large : l'option `flex` était déclarée mais
+   * jamais lue, et rien ne recalculait les largeurs au redimensionnement.
+   *
+   * Au rendu uniquement — l'état n'est pas modifié. Les colonnes épinglées ne
+   * bougent jamais : leurs décalages collants (`getStart` / `getAfter`, calculés
+   * sur les tailles d'état) restent donc justes.
+   */
+  private stretchToAvailableWidth(columns: RenderColumn[]): void {
+    if (this.opts.fillWidth === false || this.availableWidth <= 0) return
+
+    let remaining = this.availableWidth - columns.reduce((sum, c) => sum + c.width, 0)
+    if (remaining <= 0) return
+
+    // Une largeur réglée par l'utilisateur (ou restaurée de ses préférences)
+    // figure dans `columnSizing` : elle est respectée telle quelle.
+    const userSized = (this.table.store.state.columnSizing ?? {}) as Record<string, number>
+    const maxOf = (c: RenderColumn) => c.def.maxWidth ?? Number.MAX_SAFE_INTEGER
+    const candidates = columns.filter(c =>
+      !c.pinned
+      && c.def.resizable !== false
+      && userSized[c.id] === undefined
+      && c.width < maxOf(c),
+    )
+    if (candidates.length === 0) return
+
+    const flexed = candidates.filter(c => (c.def.flex ?? 0) > 0)
+    const pool = flexed.length > 0 ? flexed : candidates
+    const weightOf = new Map(pool.map(c => [c.id, flexed.length > 0 ? (c.def.flex as number) : c.width]))
+
+    // Passes successives : une colonne qui atteint son `maxWidth` rend la main.
+    let active = pool
+    while (remaining > 0 && active.length > 0) {
+      const totalWeight = active.reduce((sum, c) => sum + (weightOf.get(c.id) ?? 0), 0)
+      if (totalWeight <= 0) break
+
+      let given = 0
+      for (const c of active) {
+        const share = Math.floor(remaining * (weightOf.get(c.id) ?? 0) / totalWeight)
+        const add = Math.min(share, maxOf(c) - c.width)
+        c.width += add
+        given += add
+      }
+      remaining -= given
+      active = active.filter(c => c.width < maxOf(c))
+
+      if (given === 0) {
+        // Plus rien à répartir par proportion : les pixels d'arrondi, un par colonne.
+        for (const c of active) {
+          if (remaining <= 0) break
+          c.width += 1
+          remaining -= 1
+        }
+        break
+      }
+    }
   }
 
   /**

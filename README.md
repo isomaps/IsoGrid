@@ -149,6 +149,32 @@ visible :
 new IsoGrid(el, { toolbar: { exportButton: true } })
 ```
 
+## Largeur des colonnes
+
+Par défaut, les colonnes **occupent toute la largeur** de la grille (`fillWidth: true`).
+Quand leur somme est plus petite, l'espace restant est réparti :
+
+- entre les colonnes **non épinglées**, **redimensionnables** et que l'utilisateur
+  n'a **pas** redimensionnées — une largeur réglée à la main est respectée telle quelle ;
+- au prorata de `flex` si au moins une colonne le déclare, sinon au prorata de leur largeur ;
+- dans la limite de `maxWidth`.
+
+```ts
+columns: [
+  { id: 'name', width: 200, flex: 2 },   // prend 2 parts de l'espace restant
+  { id: 'city', width: 140, flex: 1 },   // en prend 1
+  { id: 'code', width: 90 },             // sans flex : ne s'étire pas si d'autres en ont
+]
+```
+
+La répartition se fait **au rendu** : rien n'est écrit dans l'état, rien n'est
+persisté, et la grille se recalcule d'elle-même au redimensionnement — y compris
+quand elle était masquée à la construction. Les colonnes épinglées ne bougent
+jamais. Pour retrouver des largeurs strictement fixes : `fillWidth: false`.
+
+À ne pas confondre avec `sizeColumnsToFit()`, qui **écrit** les largeurs calculées
+dans l'état, une seule fois, y compris celles des colonnes épinglées.
+
 ## API
 
 ```ts
