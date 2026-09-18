@@ -15,6 +15,7 @@ import type { ContextMenuItem } from '../ui/context-menu'
 export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState } from './selection'
 export type { AggFunc, BuiltInAggFunc, DisplayRow, GroupNode } from './grouping'
 export type { DetailContext, MasterDetailOptions } from './detail'
+export type { CellEditEvent, CellEditor, CellEditorFactory, EditingOptions } from './editing'
 
 /* ------------------------------------------------------------------------ */
 /* Colonnes                                                                  */
@@ -107,6 +108,22 @@ export interface ColumnDef<TRow = AnyRow> {
 
   /** Valeur utilisée à l'export (défaut : `valueFormatter`, sinon la valeur brute). */
   exportValue?: (ctx: CellContext<TRow>) => string | number | Date | boolean | null
+
+  /**
+   * Cellule modifiable.
+   * `true` pour toute la colonne, ou une fonction pour décider ligne par ligne
+   * (une commande validée ne se modifie plus, par exemple).
+   */
+  editable?: boolean | ((ctx: CellContext<TRow>) => boolean)
+
+  /** Éditeur sur mesure. Par défaut, un champ déduit de `type`. */
+  cellEditor?: import('./editing').CellEditorFactory<TRow>
+
+  /**
+   * Convertit la saisie en valeur métier — l'inverse de `valueFormatter`.
+   * Par défaut : nombre pour `type: 'number'`, chaîne sinon, `null` si vide.
+   */
+  valueParser?: (saisie: unknown, ctx: CellContext<TRow>) => unknown
 
   /** Format de nombre/date Excel (ex. `'#,##0.00'`, `'dd/mm/yyyy'`). */
   exportFormat?: string
@@ -662,6 +679,18 @@ export interface IsoGridOptions<TRow = AnyRow> {
   onRowDoubleClick?: (row: TRow, index: number, event: MouseEvent) => void
   onCellClick?: (ctx: CellContext<TRow>, event: MouseEvent) => void
 
+  /** Active l'édition en cellule. Voir `ColumnDef.editable` pour le périmètre. */
+  editing?: false | import('./editing').EditingOptions
+
+  /**
+   * Une cellule vient d'être validée.
+   *
+   * Retourner une promesse fait attendre la grille : la cellule reste en état
+   * d'enregistrement, et un rejet annule la saisie sans rien écrire dans la
+   * ligne. C'est ce qui permet de refuser une valeur côté serveur.
+   */
+  onCellValueChanged?: (event: import('./editing').CellEditEvent<TRow>) => void | Promise<void>
+
   /** Remontée d'erreur de chargement. Défaut : log console + bandeau. */
   onError?: (error: unknown) => void
 
@@ -741,6 +770,8 @@ export interface IsoGridApi<TRow = AnyRow> {
 
   /* --- sélection --- */
   /** Lignes sélectionnées ET actuellement chargées. Voir `getSelection()`. */
+  startEditingCell(rowId: string, columnId: string): void
+  stopEditing(cancel?: boolean): void
   getSelectedRows(): TRow[]
   /**
    * État complet et sérialisable de la sélection — c'est ce qu'une action de

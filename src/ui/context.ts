@@ -21,6 +21,17 @@ export interface GridContext {
 
   icon(name: IconName): Node
 
+  /**
+   * Racine où monter les éléments flottants — menus, popovers, bulles.
+   *
+   * Ils vivent hors du conteneur de la grille pour ne pas être rognés par son
+   * `overflow`. Mais quand la grille est dans un shadow DOM, `document.body`
+   * les place hors de portée de la feuille de styles : ils s'affichent alors
+   * sans aucune mise en forme. On monte donc dans la racine de la grille, qui
+   * est le shadow root le cas échéant, et `document.body` sinon.
+   */
+  portal(): HTMLElement | ShadowRoot
+
   /** Redessine l'en-tête et le corps sans refaire de requête. */
   requestRender(): void
   /** Le tri ou les filtres ont changé : le cache est invalidé et on repart du haut. */

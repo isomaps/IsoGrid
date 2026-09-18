@@ -379,7 +379,7 @@ export class HeaderRenderer {
       }))
     }
 
-    document.body.append(menu)
+    this.ctx.portal().append(menu)
     positionFloating(anchor, menu)
     dispose = onDismiss(menu, close)
     menu.querySelector<HTMLElement>('button')?.focus()

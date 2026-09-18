@@ -105,6 +105,28 @@ export function getPath(obj: unknown, path: string): unknown {
 }
 
 /**
+ * Écrit `a.b.c` dans un objet, en créant les maillons manquants.
+ *
+ * L'écriture est en place : la grille modifie la ligne que l'hôte lui a
+ * donnée, de sorte que l'objet qu'il garde par ailleurs reste la même
+ * référence et reflète la saisie sans recharger.
+ */
+export function setPath(obj: unknown, path: string, value: unknown): void {
+  if (obj == null) return
+  if (!path.includes('.')) {
+    (obj as Record<string, unknown>)[path] = value
+    return
+  }
+  const parts = path.split('.')
+  let cur = obj as Record<string, unknown>
+  for (const part of parts.slice(0, -1)) {
+    if (cur[part] == null || typeof cur[part] !== 'object') cur[part] = {}
+    cur = cur[part] as Record<string, unknown>
+  }
+  cur[parts[parts.length - 1]!] = value
+}
+
+/**
  * Ferme un flottant (menu, popover) au prochain clic extérieur ou à Échap.
  * Retourne la fonction de démontage.
  */

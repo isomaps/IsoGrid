@@ -1315,3 +1315,57 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 }
 .isg-row:hover .isg-row-actions-btn,
 .isg-row-actions-btn:focus-visible { opacity: 1; }
+
+/* --- Édition de cellule ------------------------------------------------ */
+
+/* Repère discret : la cellule est modifiable, sans surcharger un tableau
+   où presque tout l'est. Le pointeur suffit à l'annoncer au survol. */
+.isg-cell-editable { cursor: cell; }
+
+.isg-cell-editing {
+  padding: 0;
+  box-shadow: inset 0 0 0 2px var(--isg-accent);
+  background: var(--isg-bg);
+}
+
+.isg-cell-editor {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: none;
+  padding: 0 var(--isg-cell-padding, 10px);
+  font: inherit;
+  color: var(--isg-fg);
+  background: transparent;
+  box-sizing: border-box;
+}
+.isg-cell-editor-check {
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+  accent-color: var(--isg-accent);
+}
+.isg-cell-editor:disabled { opacity: .6; }
+
+/* L'hôte est en train d'enregistrer : la cellule reste en place, la barre
+   d'accent pulse. Pas de sablier, qui ferait croire à un blocage global. */
+.isg-cell-saving { box-shadow: inset 0 0 0 2px var(--isg-accent); }
+.isg-cell-saving::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--isg-accent);
+  animation: isg-saving 1s ease-in-out infinite;
+}
+@keyframes isg-saving {
+  0%, 100% { opacity: .25; }
+  50% { opacity: 1; }
+}
+
+/* Valeur refusée : l'ancienne est déjà revenue, le rouge ne fait que le dire. */
+.isg-cell-error {
+  box-shadow: inset 0 0 0 2px var(--isg-danger);
+  transition: box-shadow .3s ease;
+}

@@ -23,7 +23,10 @@ import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
 import { GroupPanel } from './group-panel'
 import { ContextMenu, type ContextMenuOptions } from './context-menu'
-import { NS, el, getPath, renderIcon } from './dom'
+import { NS, el, getPath, renderIcon, setPath } from './dom'
+import {
+  type CellEditor, createDefaultEditor, isCellEditable, parseEditedValue,
+} from '../core/editing'
 import { DEFAULTS } from '../core/defaults'
 
 
@@ -44,6 +47,15 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private detailObserver?: ResizeObserver
   /** Dernière ligne cochée, pour la sélection de plage au Maj-clic. */
   private lastSelectedIndex: number | null = null
+  /** Cellule en cours d'édition. Une seule à la fois. */
+  private edition: {
+    cell: HTMLElement
+    editor: CellEditor
+    ctx: CellContext<TRow>
+    rowId: string
+    /** Évite qu'une validation par Entrée et le flou consécutif s'appliquent deux fois. */
+    close: boolean
+  } | null = null
   private ctx: GridContext
 
   /* --- DOM --- */
@@ -135,6 +147,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       options: this.options as IsoGridOptions<AnyRow>,
       api: this as unknown as IsoGridApi<AnyRow>,
       icon: (name: IconName) => renderIcon(name, this.options.renderIcon),
+      portal: () => {
+        const racine = this.root.getRootNode()
+        return racine instanceof ShadowRoot ? racine : document.body
+      },
       requestRender: () => this.render(),
       reload: () => this.reload(),
       emitState: () => this.emitState(),
@@ -1020,6 +1036,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       },
     })
     if (!row) node.dataset.skeleton = '1'
+    /* L'édition retrouve sa cellule par ces deux repères : c'est ce qui permet
+       de rouvrir un éditeur après un re-rendu, ou depuis l'API. */
+    node.dataset.rowIndex = String(index)
+    if (row) node.dataset.rowId = this.rowId(row, index)
 
     for (const column of columns) {
       node.append(this.buildCell(column, row, index, level))
@@ -1115,6 +1135,18 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     if (this.options.onCellClick) {
       cell.addEventListener('click', e => this.options.onCellClick!(ctx, e))
+    }
+
+    /* L'édition se monte sur la cellule et non sur la ligne : c'est le seul
+       niveau qui sait de quelle colonne il s'agit. */
+    if (this.options.editing && isCellEditable(def, ctx)) {
+      cell.classList.add(`${NS}-cell-editable`)
+      const geste = this.options.editing.startOn ?? 'dblclick'
+      if (geste !== 'none') {
+        cell.addEventListener(geste === 'click' ? 'click' : 'dblclick', () => {
+          this.startEditingCell(this.rowId(row, rowIndex), def.id)
+        })
+      }
     }
 
     // Le clic droit est écouté sur la cellule et non sur la ligne : c'est le
@@ -1645,6 +1677,138 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   setQuickFilter(value: string): void {
     this.columnModel.setQuickFilter(value)
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Édition de cellule                                                   */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Ouvre l'édition d'une cellule.
+   *
+   * Sans effet si l'édition est désactivée, si la colonne refuse cette ligne,
+   * ou si la ligne n'est pas chargée — en mode serveur, on n'édite que ce qui
+   * est à l'écran.
+   */
+  startEditingCell(rowId: string, columnId: string): void {
+    if (!this.options.editing) return
+    this.stopEditing()
+
+    const cell = this.bodyEl.querySelector<HTMLElement>(
+      `[data-row-id="${CSS.escape(rowId)}"] [data-col-id="${CSS.escape(columnId)}"]`,
+    )
+    if (!cell) return
+
+    const def = this.columnModel.getDef(columnId)
+    if (!def) return
+
+    const rowIndex = Number(cell.closest(`.${NS}-row`)?.getAttribute('data-row-index') ?? -1)
+    const row = this.cache.getRow(rowIndex) ?? this.getLoadedRows()[rowIndex]
+    if (!row) return
+
+    const value = getPath(row, def.field ?? def.id)
+    const ctx: CellContext<TRow> = { value, row, rowIndex, column: def as ColumnDef<TRow>, grid: this }
+    if (!isCellEditable(def as ColumnDef<TRow>, ctx)) return
+
+    const fabrique = (def as ColumnDef<TRow>).cellEditor ?? createDefaultEditor
+    const editor = fabrique(ctx)
+
+    cell.classList.add(`${NS}-cell-editing`)
+    cell.textContent = ''
+    cell.append(editor.element)
+    this.edition = { cell, editor, ctx, rowId, close: false }
+
+    editor.element.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); this.stopEditing(true) }
+      else if (e.key === 'Enter') { e.preventDefault(); void this.commitEdit(true) }
+      else if (e.key === 'Tab') { e.preventDefault(); void this.commitEdit(false, e.shiftKey ? -1 : 1) }
+    })
+    /* Un clic ailleurs vaut validation : c'est ce que fait un tableur, et
+       c'est moins déroutant que de perdre la saisie. */
+    editor.element.addEventListener('blur', () => { if (!this.edition?.close) void this.commitEdit(false) })
+
+    editor.focus()
+  }
+
+  /** Ferme l'édition en cours. `annuler` jette la saisie. */
+  stopEditing(annuler = false): void {
+    const e = this.edition
+    if (!e) return
+    e.close = true
+    this.edition = null
+    e.editor.destroy?.()
+    e.cell.classList.remove(`${NS}-cell-editing`, `${NS}-cell-saving`)
+    /* Remettre l'affichage : la valeur n'a pas bougé si l'on annule, et si
+       elle a bougé, la ligne porte déjà la nouvelle. */
+    e.cell.textContent = this.formatValue(e.ctx.column as ColumnDef<TRow>, {
+      ...e.ctx,
+      value: getPath(e.ctx.row, (e.ctx.column.field ?? e.ctx.column.id)),
+    })
+    void annuler
+  }
+
+  /**
+   * Valide la saisie.
+   *
+   * L'écriture dans la ligne n'a lieu qu'une fois `onCellValueChanged` résolu :
+   * un hôte qui refuse la valeur (contrôle serveur, conflit) laisse la cellule
+   * telle qu'elle était, sans que la grille ait à savoir pourquoi.
+   */
+  private async commitEdit(parEntree: boolean, deplacement = 0): Promise<void> {
+    const e = this.edition
+    if (!e) return
+    const def = e.ctx.column as ColumnDef<TRow>
+    const chemin = def.field ?? def.id
+    const ancienne = getPath(e.ctx.row, chemin)
+    const nouvelle = parseEditedValue(def, e.editor.getValue(), e.ctx)
+
+    if (nouvelle === ancienne) { this.stopEditing(); this.apresEdition(e, parEntree, deplacement); return }
+
+    const evenement = {
+      row: e.ctx.row, rowId: e.rowId, rowIndex: e.ctx.rowIndex,
+      column: def, oldValue: ancienne, newValue: nouvelle,
+    }
+
+    try {
+      const retour = this.options.onCellValueChanged?.(evenement)
+      if (retour instanceof Promise) {
+        e.cell.classList.add(`${NS}-cell-saving`)
+        ;(e.editor.element as HTMLInputElement).disabled = true
+        await retour
+      }
+      setPath(e.ctx.row, chemin, nouvelle)
+      this.stopEditing()
+      this.apresEdition(e, parEntree, deplacement)
+    } catch (err) {
+      e.cell.classList.remove(`${NS}-cell-saving`)
+      this.stopEditing(true)
+      e.cell.classList.add(`${NS}-cell-error`)
+      setTimeout(() => e.cell.classList.remove(`${NS}-cell-error`), 2000)
+      this.options.onError?.(err)
+    }
+  }
+
+  /** Enchaînement après validation : cellule suivante, ou ligne du dessous. */
+  private apresEdition(
+    e: NonNullable<IsoGrid<TRow>['edition']>,
+    parEntree: boolean,
+    deplacement: number,
+  ): void {
+    const editing = this.options.editing
+    if (!editing) return
+
+    if (deplacement !== 0) {
+      const cols = this.columnModel.getRenderColumns()
+        .filter(c => isCellEditable(c.def as ColumnDef<TRow>, e.ctx))
+      const i = cols.findIndex(c => c.id === e.ctx.column.id)
+      const suivante = cols[i + deplacement]
+      if (suivante) this.startEditingCell(e.rowId, suivante.id)
+      return
+    }
+    if (parEntree && editing.enterMovesDown) {
+      const ligne = this.cache.getRow(e.ctx.rowIndex + 1) ?? this.getLoadedRows()[e.ctx.rowIndex + 1]
+      if (ligne) this.startEditingCell(this.rowId(ligne, e.ctx.rowIndex + 1), e.ctx.column.id)
+    }
   }
 
   refresh(): void {

@@ -64,6 +64,8 @@ export async function writeToClipboard(text: string): Promise<boolean> {
     // Hors écran plutôt que `display:none` : un élément non rendu n'est pas
     // sélectionnable, donc la copie échouerait silencieusement.
     area.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0'
+    /* Dans le document, pas dans le portail : `execCommand('copy')` ne voit
+       pas une sélection faite à l'intérieur d'un shadow root. */
     document.body.append(area)
     area.select()
     const ok = document.execCommand('copy')
@@ -124,7 +126,7 @@ export class ContextMenu {
       }))
     }
 
-    document.body.append(menu)
+    this.ctx.portal().append(menu)
     this.element = menu
     this.positionAtPointer(menu, x, y)
     this.dispose = onDismiss(menu, () => this.close())
@@ -219,7 +221,7 @@ export class ContextMenu {
       attrs: { role: 'status', 'aria-live': 'polite' },
       children: [this.ctx.icon(ok ? 'check' : 'warning'), el('span', { text: message })],
     })
-    document.body.append(toast)
+    this.ctx.portal().append(toast)
     setTimeout(() => {
       toast.classList.add(`${NS}-toast-out`)
       setTimeout(() => toast.remove(), 250)

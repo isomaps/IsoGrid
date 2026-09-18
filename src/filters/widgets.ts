@@ -360,7 +360,7 @@ export function openFilterPopover(
   })
   popover.append(editor.element)
 
-  document.body.append(popover)
+  ctx.portal().append(popover)
   positionFloating(anchor, popover)
 
   const dispose = onDismiss(popover, () => {
