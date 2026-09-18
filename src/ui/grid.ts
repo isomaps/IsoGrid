@@ -731,7 +731,15 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * retirée : c'est alors le seul moyen de sélectionner.
    */
   private selectionParLigne(): boolean {
-    return this.options.selectOnRowClick === true || this.options.selectionColumn === false
+    if (this.options.selectOnRowClick != null) return this.options.selectOnRowClick
+    /*
+     * Pas de colonne de cases à cocher — soit qu'on l'ait retirée, soit que le
+     * mode `single` n'en ait jamais : le clic sur la ligne est alors le SEUL
+     * geste qui reste pour choisir. Sans cette bascule, la sélection serait
+     * déclarée et inatteignable, et les actions de masse inertes sans que rien
+     * ne le signale.
+     */
+    return this.options.selectionColumn === false || this.options.rowSelection === 'single'
   }
 
   private isSelectionEnabled(): boolean {
@@ -2207,6 +2215,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   setRowSelected(rowId: string, selected: boolean): void {
+    /* En mode `single`, choisir une ligne retire la précédente — sinon l'appel
+     * par programme produirait une sélection multiple que le clic, lui, ne
+     * peut pas produire. */
+    if (selected && this.options.rowSelection === 'single') {
+      this.selection.selectOnly(rowId)
+      return
+    }
     this.selection.setSelected(rowId, selected)
   }
 

@@ -583,7 +583,11 @@ export interface IsoGridOptions<TRow = AnyRow> {
 
   /**
    * Sélectionner la ligne au clic n'importe où, pas seulement sur la case.
-   * Défaut : false — sinon un clic destiné à ouvrir la fiche sélectionne.
+   *
+   * Non renseigné, il suit la présence de la colonne de cases : `false` quand
+   * elle est là — sinon un clic destiné à ouvrir la fiche sélectionnerait —
+   * et `true` quand elle n'y est pas, c'est-à-dire en mode `single` ou après
+   * `selectionColumn: false`. Le renseigner tranche dans les deux sens.
    */
   selectOnRowClick?: boolean
 
