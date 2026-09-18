@@ -19,6 +19,7 @@ import { exportToCsv } from '../export/csv'
 import { exportToExcel } from '../export/excel'
 import type { GridContext } from './context'
 import { HeaderRenderer } from './header'
+import { FooterRenderer } from './footer'
 import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
 import { GroupPanel } from './group-panel'
@@ -65,6 +66,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private overlay!: HTMLElement
   private statusEl?: HTMLElement
   private headerRenderer: HeaderRenderer
+  private footerRenderer?: FooterRenderer
   private toolbar?: Toolbar
   private sidebar?: Sidebar
   private groupPanel?: GroupPanel
@@ -269,10 +271,18 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.bodyEl = el('div', { class: `${NS}-body`, attrs: { role: 'rowgroup' } })
     this.overlay = el('div', { class: `${NS}-overlay` })
 
+    const enfantsViewport: HTMLElement[] = [this.headerRenderer.element, this.bodyEl]
+    if (this.options.footer) {
+      this.footerRenderer = new FooterRenderer(this.t)
+      /* Dans le viewport, donc solidaire du défilement horizontal, et collé en
+         bas par le CSS : les totaux restent sous leur colonne. */
+      enfantsViewport.push(this.footerRenderer.element)
+    }
+
     this.viewport = el('div', {
       class: `${NS}-viewport`,
       attrs: { tabindex: 0 },
-      children: [this.headerRenderer.element, this.bodyEl],
+      children: enfantsViewport,
     })
     this.viewport.addEventListener('scroll', () => this.onScroll(), { passive: true })
 
@@ -571,6 +581,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     if (this.destroyed) return
     this.repaintSelection()
     this.renderStatus()
+    this.renderFooter()
     this.options.onSelectionChanged?.(this.getSelection(), this)
   }
 
@@ -677,6 +688,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.rebuildGroups()
     this.renderBody()
     this.renderStatus()
+    this.renderFooter()
     this.renderOverlay()
   }
 
@@ -701,6 +713,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.toolbar?.syncQuickFilter()
     this.toolbar?.syncFilterCount()
     this.renderStatus()
+    this.renderFooter()
     this.renderOverlay()
   }
 
@@ -1006,6 +1019,31 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         this.bodyEl.append(this.mountDetailPanel(i, display.row, rowHeight))
       }
     }
+
+  }
+
+  /**
+   * Redessine la ligne de totaux.
+   *
+   * Volontairement PAS appelée depuis `renderBody` : celui-ci s'exécute à
+   * chaque frame de défilement, alors que les totaux ne dépendent que du jeu
+   * de données, du filtre et de la sélection. Les recalculer au scroll faisait
+   * tourner la page en boucle.
+   */
+  private renderFooter(): void {
+    if (!this.footerRenderer) return
+    const columns = this.columnModel.getRenderColumns()
+    const opts = this.options.footer === true ? {} : (this.options.footer || {})
+
+    const selection = this.isSelectionEnabled() ? this.getSelectedRows() : []
+    const surSelection = (opts.useSelection ?? true) && selection.length > 0
+    const lignes = surSelection ? selection : this.getLoadedRows()
+
+    const fournies = opts.values
+      ? opts.values({ rows: lignes, onSelection: surSelection, rowCount: this.getDisplayedRowCount() })
+      : null
+
+    this.footerRenderer.render(columns, lignes, fournies, surSelection)
   }
 
   private buildRow(
@@ -1835,6 +1873,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.toolbar?.syncFilterCount()
     this.refreshVisibleRange()
     this.renderStatus()
+    this.renderFooter()
     this.renderOverlay()
     // Les frontieres dependent des filtres : un rechargement les invalide.
     this.sectionsSignature = null

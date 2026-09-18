@@ -8,12 +8,11 @@
  */
 
 import type { SelectionSnapshot, SelectionState } from './selection'
-import type { AggFunc } from './grouping'
 import type { MasterDetailOptions } from './detail'
 import type { ContextMenuItem } from '../ui/context-menu'
 
 export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionState } from './selection'
-export type { AggFunc, BuiltInAggFunc, DisplayRow, GroupNode } from './grouping'
+export type { AggFunc, BuiltInAggFunc, ColumnAgg, DisplayRow, GroupNode } from './grouping'
 export type { DetailContext, MasterDetailOptions } from './detail'
 export type { CellEditEvent, CellEditor, CellEditorFactory, EditingOptions } from './editing'
 
@@ -30,6 +29,15 @@ export type PinPosition = 'start' | 'end' | false
 export type Align = 'left' | 'center' | 'right'
 
 /** Contexte transmis aux formateurs et rendus de cellule. */
+export interface FooterContext {
+  /** Lignes servant au calcul : la sélection si elle porte, sinon les lignes chargées. */
+  rows: AnyRow[]
+  /** Vrai si `rows` est une sélection de l'utilisateur. */
+  onSelection: boolean
+  /** Total du jeu filtré, quand il est connu. */
+  rowCount: number | null
+}
+
 export interface CellContext<TRow = AnyRow> {
   value: unknown
   row: TRow
@@ -125,6 +133,12 @@ export interface ColumnDef<TRow = AnyRow> {
    */
   valueParser?: (saisie: unknown, ctx: CellContext<TRow>) => unknown
 
+  /**
+   * Mise en forme d'une valeur au pied de colonne. Défaut : nombre localisé.
+   * Reçoit le nom de l'agrégat quand la colonne en porte plusieurs.
+   */
+  footerFormatter?: (value: unknown, agg?: string) => string
+
   /** Format de nombre/date Excel (ex. `'#,##0.00'`, `'dd/mm/yyyy'`). */
   exportFormat?: string
 
@@ -142,7 +156,7 @@ export interface ColumnDef<TRow = AnyRow> {
    * `'min'`, `'max'`, `'count'`, `'first'`, `'last'`, ou une fonction.
    * Sans effet tant qu'aucun groupage n'est actif.
    */
-  aggFunc?: AggFunc
+  aggFunc?: import('./grouping').ColumnAgg
 
   /** Autorise le groupage par cette colonne. Défaut : true. */
   enableRowGroup?: boolean
@@ -678,6 +692,20 @@ export interface IsoGridOptions<TRow = AnyRow> {
   onRowClick?: (row: TRow, index: number, event: MouseEvent) => void
   onRowDoubleClick?: (row: TRow, index: number, event: MouseEvent) => void
   onCellClick?: (ctx: CellContext<TRow>, event: MouseEvent) => void
+
+  /**
+   * Ligne de totaux en pied, pour les colonnes qui portent un `aggFunc`.
+   *
+   * En modèle client la grille calcule elle-même. En modèle serveur elle n'a
+   * qu'une fenêtre sur le jeu filtré : c'est alors `values` qui fait foi,
+   * l'hôte étant seul à pouvoir totaliser l'ensemble.
+   */
+  footer?: boolean | {
+    /** Valeurs par identifiant de colonne. Priment sur tout calcul local. */
+    values?: (ctx: FooterContext) => Record<string, unknown> | null
+    /** Basculer les totaux sur la sélection quand il y en a une. Défaut : true. */
+    useSelection?: boolean
+  }
 
   /** Active l'édition en cellule. Voir `ColumnDef.editable` pour le périmètre. */
   editing?: false | import('./editing').EditingOptions

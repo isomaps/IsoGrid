@@ -1369,3 +1369,55 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   box-shadow: inset 0 0 0 2px var(--isg-danger);
   transition: box-shadow .3s ease;
 }
+
+/* --- Ligne de totaux --------------------------------------------------- */
+
+/* Collée au bas du viewport, mais dans son flux horizontal : chaque total
+   reste sous sa colonne quand on fait défiler latéralement. */
+.isg-footer-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  min-width: max-content;
+  background: var(--isg-bg-header);
+  border-top: 1px solid var(--isg-border-strong, var(--isg-border));
+  font-weight: 600;
+}
+.isg-footer-cell {
+  box-sizing: border-box;
+  padding: 0 var(--isg-cell-padding, 10px);
+  height: 30px;
+  display: flex;
+  align-items: center;
+  background: var(--isg-bg-header);
+  color: var(--isg-fg);
+  font-size: var(--isg-font-size);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.isg-footer-cell.isg-align-right { justify-content: flex-end; }
+.isg-footer-cell.isg-align-center { justify-content: center; }
+
+/* Les totaux portent sur une sélection : on le dit par la couleur plutôt que
+   par un libellé, qui n'aurait pas de colonne où tenir. */
+.isg-footer-selection .isg-footer-cell { color: var(--isg-accent); }
+
+/* Plusieurs statistiques sur une même colonne : empilées, libellé à gauche,
+   valeur à droite, pour que les nombres s'alignent et se comparent d'un coup
+   d'œil. La ligne de pied grandit d'autant. */
+.isg-footer-cell.isg-footer-multi {
+  display: block;
+  height: auto;
+  padding-block: 4px;
+  font-weight: 400;
+}
+.isg-footer-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  line-height: 1.35;
+  font-size: calc(var(--isg-font-size) - 1px);
+}
+.isg-footer-stat-label { color: var(--isg-fg-muted); }
+.isg-footer-stat-value { font-variant-numeric: tabular-nums; font-weight: 600; }

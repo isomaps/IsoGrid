@@ -44,13 +44,32 @@ export type BuiltInAggFunc = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'first' |
 /** Agrégateur sur mesure : reçoit les valeurs brutes des feuilles du groupe. */
 export type AggFunc = BuiltInAggFunc | ((values: unknown[]) => unknown)
 
+/**
+ * Agrégats d'une colonne.
+ *
+ * Une liste demande plusieurs statistiques sur la même colonne — somme,
+ * minimum, maximum, moyenne — que le pied empile les unes sous les autres.
+ * Les lignes de groupe, elles, n'en affichent qu'une : la première.
+ */
+export type ColumnAgg = AggFunc | BuiltInAggFunc[]
+
+/** La fonction à employer pour une ligne de groupe. */
+export function firstAgg(agg: ColumnAgg): AggFunc {
+  return Array.isArray(agg) ? agg[0]! : agg
+}
+
 const toNumber = (v: unknown): number | null => {
   if (v == null || v === '') return null
   const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'))
   return Number.isNaN(n) ? null : n
 }
 
-function aggregate(values: unknown[], fn: AggFunc): unknown {
+/**
+ * Applique une fonction d'agrégat à une colonne de valeurs.
+ * Exportée : la ligne de totaux en pied s'en sert aussi, pour que groupes et
+ * pied comptent exactement de la même façon.
+ */
+export function aggregate(values: unknown[], fn: AggFunc): unknown {
   if (typeof fn === 'function') return fn(values)
 
   if (fn === 'count') return values.length
@@ -60,7 +79,12 @@ function aggregate(values: unknown[], fn: AggFunc): unknown {
   // Les valeurs non numériques sont ignorées plutôt que comptées comme 0 :
   // une cellule vide ne doit pas tirer une moyenne vers le bas.
   const numbers = values.map(toNumber).filter((n): n is number => n != null)
-  if (numbers.length === 0) return null
+  if (numbers.length === 0) {
+    /* Sur un ensemble vide, seule la somme a une valeur : zéro, l'élément
+       neutre de l'addition. Un minimum, un maximum ou une moyenne de rien
+       n'existent pas — mieux vaut une cellule vide qu'un zéro trompeur. */
+    return fn === 'sum' ? 0 : null
+  }
 
   switch (fn) {
     case 'sum': return numbers.reduce((a, b) => a + b, 0)
@@ -214,7 +238,7 @@ export class GroupingModel<TRow extends AnyRow = AnyRow> {
           const aggField = agg.field ?? agg.id
           aggregates[agg.id] = aggregate(
             bucket.rows.map(r => getPath(r, aggField)),
-            agg.aggFunc!,
+            firstAgg(agg.aggFunc!),
           )
         }
 
@@ -300,7 +324,7 @@ export class GroupingModel<TRow extends AnyRow = AnyRow> {
     for (const col of columns) {
       if (col.aggFunc == null) continue
       const field = col.field ?? col.id
-      out[col.id] = aggregate(rows.map(r => getPath(r, field)), col.aggFunc)
+      out[col.id] = aggregate(rows.map(r => getPath(r, field)), firstAgg(col.aggFunc))
     }
     return out
   }

@@ -17,6 +17,8 @@ export type MessageKey =
   | 'selectAll' | 'deselectAll' | 'noValues' | 'searchValues' | 'blankValue'
   | 'selectRow' | 'selectAllRows' | 'clearSelection' | 'allRowsSelected'
   | 'rowActions'
+  /* Libellés courts des agrégats, au pied de colonne. */
+  | 'aggSum' | 'aggMin' | 'aggMax' | 'aggAvg' | 'aggCount'
   | 'groupBy' | 'ungroup' | 'expandGroup' | 'collapseGroup'
   | 'expandAllGroups' | 'collapseAllGroups' | 'groupPanelEmpty' | 'grouped'
   | 'copyCell' | 'copyRow' | 'copyRowWithHeaders' | 'copied' | 'copyFailed'
@@ -32,6 +34,11 @@ export type MessageKey =
 type Catalog = Record<MessageKey, string>
 
 const fr: Catalog = {
+  aggSum: 'SOM',
+  aggMin: 'MIN',
+  aggMax: 'MAX',
+  aggAvg: 'MOY',
+  aggCount: 'NB',
   rowActions: 'Actions',
   groupBy: 'Grouper par cette colonne',
   ungroup: 'Retirer du groupage',
@@ -128,6 +135,11 @@ const fr: Catalog = {
 }
 
 const en: Catalog = {
+  aggSum: 'SUM',
+  aggMin: 'MIN',
+  aggMax: 'MAX',
+  aggAvg: 'AVG',
+  aggCount: 'CNT',
   rowActions: 'Actions',
   groupBy: 'Group by this column',
   ungroup: 'Remove from grouping',
@@ -224,6 +236,11 @@ const en: Catalog = {
 }
 
 const de: Catalog = {
+  aggSum: 'SUM',
+  aggMin: 'MIN',
+  aggMax: 'MAX',
+  aggAvg: 'MW',
+  aggCount: 'ANZ',
   rowActions: 'Aktionen',
   groupBy: 'Nach dieser Spalte gruppieren',
   ungroup: 'Aus der Gruppierung entfernen',
@@ -320,6 +337,11 @@ const de: Catalog = {
 }
 
 const es: Catalog = {
+  aggSum: 'SUM',
+  aggMin: 'MÍN',
+  aggMax: 'MÁX',
+  aggAvg: 'PROM',
+  aggCount: 'REC',
   rowActions: 'Acciones',
   groupBy: 'Agrupar por esta columna',
   ungroup: 'Quitar de la agrupación',
@@ -416,6 +438,11 @@ const es: Catalog = {
 }
 
 const it: Catalog = {
+  aggSum: 'SOM',
+  aggMin: 'MIN',
+  aggMax: 'MAX',
+  aggAvg: 'MED',
+  aggCount: 'CONT',
   rowActions: 'Azioni',
   groupBy: 'Raggruppa per questa colonna',
   ungroup: 'Rimuovi dal raggruppamento',
@@ -512,6 +539,11 @@ const it: Catalog = {
 }
 
 const nl: Catalog = {
+  aggSum: 'SOM',
+  aggMin: 'MIN',
+  aggMax: 'MAX',
+  aggAvg: 'GEM',
+  aggCount: 'AANT',
   rowActions: 'Acties',
   groupBy: 'Groeperen op deze kolom',
   ungroup: 'Uit groepering verwijderen',
@@ -608,6 +640,11 @@ const nl: Catalog = {
 }
 
 const pl: Catalog = {
+  aggSum: 'SUMA',
+  aggMin: 'MIN',
+  aggMax: 'MAKS',
+  aggAvg: 'ŚR',
+  aggCount: 'LICZ',
   rowActions: 'Akcje',
   groupBy: 'Grupuj według tej kolumny',
   ungroup: 'Usuń z grupowania',
@@ -704,6 +741,11 @@ const pl: Catalog = {
 }
 
 const ru: Catalog = {
+  aggSum: 'СУМ',
+  aggMin: 'МИН',
+  aggMax: 'МАКС',
+  aggAvg: 'СР',
+  aggCount: 'КОЛ',
   rowActions: 'Действия',
   groupBy: 'Группировать по этому столбцу',
   ungroup: 'Убрать из группировки',
