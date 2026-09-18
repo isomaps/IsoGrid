@@ -1421,3 +1421,6 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 }
 .isg-footer-stat-label { color: var(--isg-fg-muted); }
 .isg-footer-stat-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Variante neutre du message bref : ni réussite, ni échec. */
+.isg-toast-info { background: var(--isg-fg-muted, #6b7280); }

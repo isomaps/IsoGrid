@@ -18,4 +18,8 @@ export const DEFAULTS = {
   rowActionsWidth: 48,
   /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
   overscan: 6,
+  /** Regroupement des enregistrements d'état, en ms. */
+  stateSaveDebounce: 800,
+  /** Attente maximale de l'état persisté avant de démarrer sans lui, en ms. */
+  stateLoadTimeout: 5000,
 } as const

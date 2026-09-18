@@ -8,7 +8,12 @@
                               suit les redimensionnements — raccourci vers l'option
                               `autoHeight` de la grille. Tout le reste est pris tel quel
                               comme hauteur CSS.
-    @param string $persistKey clé localStorage pour l'état (facultatif)
+    @param string $persistKey clé de l'état : nom dans le localStorage, ou
+                              discriminant envoyé au point d'entrée `stateUrl`
+    @param string $stateUrl   point d'entrée qui garde l'état côté serveur
+                              (GET pour relire, POST `{key, state}` pour écrire).
+                              Les réglages suivent alors l'utilisateur d'un poste
+                              à l'autre, au lieu de rester dans son navigateur.
     @param string $urlParam   paramètre d'URL où refléter filtres/tri/recherche,
                               pour une vue partageable (facultatif)
     @param string $locale     fr|en|de|es|it
@@ -27,6 +32,7 @@
     'height' => '70vh',
     'persistKey' => null,
     'urlParam' => null,
+    'stateUrl' => null,
     'locale' => null,
     'options' => [],
 ])
@@ -94,6 +100,7 @@
         'source' => $source,
         'persistKey' => $persistKey,
         'urlParam' => $urlParam,
+        'stateUrl' => $stateUrl,
         'autoHeight' => in_array($height, ['fill', 'auto'], true),
         'locale' => $locale ?? app()->getLocale(),
         'excelJsUrl' => url('/vendor/isogrid/exceljs.js').'?v='.$isogridV,

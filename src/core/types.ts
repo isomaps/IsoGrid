@@ -15,6 +15,7 @@ export type { HeaderCheckboxState, SelectionMode, SelectionSnapshot, SelectionSt
 export type { AggFunc, BuiltInAggFunc, ColumnAgg, DisplayRow, GroupNode } from './grouping'
 export type { DetailContext, MasterDetailOptions } from './detail'
 export type { CellEditEvent, CellEditor, CellEditorFactory, EditingOptions } from './editing'
+export type { ToastKind, ToastOptions } from '../ui/toast'
 
 /* ------------------------------------------------------------------------ */
 /* Colonnes                                                                  */
@@ -689,6 +690,22 @@ export interface IsoGridOptions<TRow = AnyRow> {
    */
   onFullscreenChange?: (actif: boolean) => void
 
+  /**
+   * Où ranger les préférences d'affichage — colonnes, tri, filtres.
+   *
+   * L'hôte fournit `load` et `save`, éventuellement asynchrones : la grille
+   * relit l'état au montage et le réenregistre après chaque changement, sans
+   * rien savoir du transport. C'est ce qui permet de garder les réglages sur
+   * un serveur, donc de les retrouver d'un poste à l'autre, là où le
+   * `localStorage` reste prisonnier d'un navigateur.
+   *
+   * Ce qui vient du dépôt l'emporte sur `initialState`. Un échec de lecture ou
+   * d'écriture est absorbé : la grille travaille quand même.
+   *
+   * Voir `createHttpStateStore` et `createLocalStateStore`.
+   */
+  stateStore?: import('./state-store').GridStateStore
+
   onRowClick?: (row: TRow, index: number, event: MouseEvent) => void
   onRowDoubleClick?: (row: TRow, index: number, event: MouseEvent) => void
   onCellClick?: (ctx: CellContext<TRow>, event: MouseEvent) => void
@@ -798,6 +815,8 @@ export interface IsoGridApi<TRow = AnyRow> {
 
   /* --- sélection --- */
   /** Lignes sélectionnées ET actuellement chargées. Voir `getSelection()`. */
+  /** Affiche une confirmation brève en bas de la grille. */
+  toast(message: string, options?: import('../ui/toast').ToastOptions): void
   startEditingCell(rowId: string, columnId: string): void
   stopEditing(cancel?: boolean): void
   getSelectedRows(): TRow[]

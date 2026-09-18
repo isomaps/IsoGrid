@@ -36,7 +36,7 @@ function serializeRequest(req: DataRequest): Record<string, unknown> {
  * Récupère le jeton CSRF de Laravel. Les trois repos web posent la balise
  * `<meta name="csrf-token">` dans leur layout : sans ça, tout POST prend un 419.
  */
-function csrfToken(): string | undefined {
+export function csrfToken(): string | undefined {
   const meta = document.querySelector('meta[name="csrf-token"]')
   return meta?.getAttribute('content') ?? undefined
 }

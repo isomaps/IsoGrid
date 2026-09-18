@@ -211,20 +211,8 @@ export class ContextMenu {
 
   private async copy(text: string): Promise<void> {
     const ok = await writeToClipboard(text)
-    this.toast(ok ? this.ctx.t.t('copied') : this.ctx.t.t('copyFailed'), ok)
+    this.ctx.toast(ok ? this.ctx.t.t('copied') : this.ctx.t.t('copyFailed'),
+                   { kind: ok ? 'success' : 'error' })
   }
 
-  /** Confirmation brève : sans retour visible, on ne sait pas si la copie a pris. */
-  private toast(message: string, ok: boolean): void {
-    const toast = el('div', {
-      class: `${NS}-toast${ok ? '' : ` ${NS}-toast-error`}`,
-      attrs: { role: 'status', 'aria-live': 'polite' },
-      children: [this.ctx.icon(ok ? 'check' : 'warning'), el('span', { text: message })],
-    })
-    this.ctx.portal().append(toast)
-    setTimeout(() => {
-      toast.classList.add(`${NS}-toast-out`)
-      setTimeout(() => toast.remove(), 250)
-    }, 1600)
-  }
 }

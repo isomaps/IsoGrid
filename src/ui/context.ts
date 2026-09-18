@@ -21,6 +21,9 @@ export interface GridContext {
 
   icon(name: IconName): Node
 
+  /** Confirmation brève en bas de grille. Voir `ToastHost`. */
+  toast(message: string, options?: import('./toast').ToastOptions): void
+
   /**
    * Racine où monter les éléments flottants — menus, popovers, bulles.
    *

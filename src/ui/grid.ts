@@ -20,11 +20,13 @@ import { exportToExcel } from '../export/excel'
 import type { GridContext } from './context'
 import { HeaderRenderer } from './header'
 import { FooterRenderer } from './footer'
+import { ToastHost, type ToastOptions } from './toast'
 import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
 import { GroupPanel } from './group-panel'
 import { ContextMenu, type ContextMenuOptions } from './context-menu'
-import { NS, el, getPath, renderIcon, setPath } from './dom'
+import { NS, debounce, el, getPath, renderIcon, setPath } from './dom'
+import { isPromiseLike } from '../core/state-store'
 import {
   type CellEditor, createDefaultEditor, isCellEditable, parseEditedValue,
 } from '../core/editing'
@@ -67,6 +69,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private statusEl?: HTMLElement
   private headerRenderer: HeaderRenderer
   private footerRenderer?: FooterRenderer
+  private toastHost!: ToastHost
   private toolbar?: Toolbar
   private sidebar?: Sidebar
   private groupPanel?: GroupPanel
@@ -101,6 +104,19 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   /** Signature des filtres pour lesquels `sections` a ete obtenu. */
   private sectionsSignature: string | null = null
 
+  /* --- persistance de l'état côté hôte --- */
+  /** Vrai tant que l'état persisté n'est pas arrivé : rien n'est encore chargé. */
+  private stateLoading = false
+  /** Vrai pendant l'application de l'état relu : on ne le renvoie pas à l'hôte. */
+  private restoringState = false
+  private saveStateSoon?: (() => void) & { cancel(): void }
+  /** Un enregistrement est demandé mais pas encore parti. */
+  private savePending = false
+  /** Un enregistrement est en cours : le suivant attend son tour. */
+  private saveInFlight = false
+  private saveAgain = false
+  private stateStoreWarned = false
+
   constructor(container: HTMLElement, options: IsoGridOptions<TRow>) {
     this.options = options
     this.t = new Translator(resolveLocale(options.locale), options.messages)
@@ -108,6 +124,14 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.selection = new SelectionModel(() => this.onSelectionChange())
     this.grouping = new GroupingModel<TRow>({ defaultExpanded: options.groupDefaultExpanded })
     this.detailLayout = new DetailLayout(options.rowHeight ?? DEFAULTS.rowHeight)
+
+    // L'état persisté est relu AVANT toute construction. S'il arrive tout de
+    // suite (localStorage, cache mémoire), il se fond dans `initialState` et
+    // la grille se monte d'emblée dans les réglages de l'utilisateur. S'il est
+    // asynchrone, `attente` porte la promesse et le premier chargement de
+    // données est repoussé jusqu'à son arrivée — la grille ne se dessine
+    // qu'une fois, au lieu de s'afficher puis de se réafficher autrement.
+    const attente = this.loadPersistedState()
 
     const initialGroups = options.initialState?.rowGroup ?? options.rowGroup ?? []
     if (initialGroups.length > 0) this.grouping.setGroupBy(initialGroups)
@@ -149,6 +173,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       options: this.options as IsoGridOptions<AnyRow>,
       api: this as unknown as IsoGridApi<AnyRow>,
       icon: (name: IconName) => renderIcon(name, this.options.renderIcon),
+      toast: (message: string, options?: ToastOptions) => this.toastHost.show(message, options),
       portal: () => {
         const racine = this.root.getRootNode()
         return racine instanceof ShadowRoot ? racine : document.body
@@ -168,6 +193,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         : undefined,
     }
 
+    this.toastHost = new ToastHost(
+      () => this.ctx.portal(),
+      (name) => this.ctx.icon(name),
+    )
     this.headerRenderer = new HeaderRenderer(this.ctx)
     this.rowActionsMenu = new ContextMenu(this.ctx, {})
     if (options.contextMenu !== false) {
@@ -180,7 +209,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.applyTheme(options.theme ?? 'auto')
     this.columnModel.setAvailableWidth(this.usableWidth())
     this.render()
-    this.refreshVisibleRange()
+    if (attente) void this.awaitPersistedState(attente)
+    else this.refreshVisibleRange()
 
     // Un seul écouteur global, posé une fois — pas seulement quand le bouton
     // est actif : `toggleFullscreen()` reste appelable par programme même sans
@@ -189,7 +219,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     this.installerAutoHeight(container)
 
-    if (this.options.sections) void this.fetchSections()
+    // Les intertitres dépendent des filtres : s'ils sont encore attendus du
+    // dépôt d'état, on les demandera une fois l'état appliqué.
+    if (this.options.sections && !this.stateLoading) void this.fetchSections()
   }
 
   /**
@@ -220,6 +252,148 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     requestAnimationFrame(etirer)
     this.surRedimensionnementFenetre = etirer
     window.addEventListener('resize', etirer)
+  }
+
+  /* -------------------------------------------------------------------- */
+  /* Persistance de l'état côté hôte                                       */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * Demande l'état au dépôt de l'hôte.
+   *
+   * Réponse immédiate : elle est fusionnée dans `initialState` et rien d'autre
+   * ne se passe. Promesse : elle est rendue à l'appelant, qui l'attendra une
+   * fois le DOM monté. Un dépôt qui lève n'arrête pas le montage.
+   */
+  private loadPersistedState(): Promise<Partial<GridState> | null | undefined> | null {
+    const store = this.options.stateStore
+    if (!store?.load) return null
+
+    let out: ReturnType<NonNullable<typeof store.load>>
+    try {
+      out = store.load()
+    } catch (error) {
+      this.onStateStoreError(error, 'load')
+      return null
+    }
+
+    if (isPromiseLike<Partial<GridState> | null | undefined>(out)) {
+      this.stateLoading = true
+      return Promise.resolve(out)
+    }
+    if (out) this.options.initialState = { ...this.options.initialState, ...out }
+    return null
+  }
+
+  /**
+   * Applique l'état qui arrive après coup, sans faire clignoter la grille.
+   *
+   * Tant qu'il n'est pas là, aucune ligne n'est demandée : les charger avec le
+   * mauvais tri pour les recharger aussitôt ferait un aller-retour visible, et
+   * deux requêtes au serveur. Un délai de garde évite qu'un dépôt muet laisse
+   * la grille en attente pour toujours ; si l'état finit par arriver, il est
+   * appliqué quand même.
+   */
+  private async awaitPersistedState(
+    attente: Promise<Partial<GridState> | null | undefined>,
+  ): Promise<void> {
+    let demarre = false
+    const demarrer = (): void => {
+      if (demarre || this.destroyed) return
+      demarre = true
+      this.stateLoading = false
+      this.render()
+      this.refreshVisibleRange()
+      if (this.options.sections) void this.fetchSections()
+    }
+
+    const delai = this.options.stateStore?.loadTimeout ?? DEFAULTS.stateLoadTimeout
+    const garde = setTimeout(demarrer, delai)
+
+    let state: Partial<GridState> | null | undefined
+    try {
+      state = await attente
+    } catch (error) {
+      this.onStateStoreError(error, 'load')
+    }
+    clearTimeout(garde)
+    if (this.destroyed) return
+
+    if (state) this.applyRestoredState(state)
+    demarrer()
+  }
+
+  /** Pose l'état relu sans le réenregistrer aussitôt : l'hôte nous l'a donné. */
+  private applyRestoredState(state: Partial<GridState>): void {
+    this.restoringState = true
+    try {
+      this.setState(state)
+    } finally {
+      this.restoringState = false
+    }
+  }
+
+  /**
+   * Enregistre l'état, une fois les changements rapprochés regroupés.
+   *
+   * Redimensionner une colonne ou taper dans un filtre produit des dizaines de
+   * changements par seconde : sans regroupement, autant d'écritures. Et deux
+   * enregistrements ne se croisent jamais — le second attend la fin du premier
+   * pour partir, sans quoi une réponse en retard écraserait l'état le plus
+   * récent.
+   */
+  private persistState(): void {
+    const store = this.options.stateStore
+    if (!store?.save) return
+    // L'état enregistré n'a pas encore été relu : l'écraser maintenant avec
+    // celui par défaut effacerait les préférences qu'on est en train d'attendre.
+    if (this.stateLoading) return
+    this.saveStateSoon ??= debounce(
+      () => this.pushState(),
+      store.debounce ?? DEFAULTS.stateSaveDebounce,
+    )
+    this.savePending = true
+    this.saveStateSoon()
+  }
+
+  private pushState(): void {
+    const store = this.options.stateStore
+    if (!store?.save) return
+    if (this.saveInFlight) { this.saveAgain = true; return }
+    this.savePending = false
+
+    let out: void | Promise<void>
+    try {
+      out = store.save(this.getState())
+    } catch (error) {
+      this.onStateStoreError(error, 'save')
+      return
+    }
+    if (!isPromiseLike<void>(out)) return
+
+    this.saveInFlight = true
+    Promise.resolve(out)
+      .catch((error: unknown) => this.onStateStoreError(error, 'save'))
+      .then(() => {
+        this.saveInFlight = false
+        if (!this.saveAgain) return
+        this.saveAgain = false
+        this.pushState()
+      })
+  }
+
+  /**
+   * Une préférence d'affichage qui ne s'enregistre pas ne doit jamais empêcher
+   * de travailler : on prévient l'hôte, ou on se contente d'un avertissement —
+   * une seule fois, pour ne pas noyer la console quand le réseau est coupé.
+   */
+  private onStateStoreError(error: unknown, phase: 'load' | 'save'): void {
+    const store = this.options.stateStore
+    if (store?.onError) { store.onError(error, phase); return }
+    if (this.stateStoreWarned) return
+    this.stateStoreWarned = true
+    const quoi = phase === 'load' ? 'relues' : 'enregistrées'
+    console.warn(`[IsoGrid] les préférences d'affichage n'ont pas pu être ${quoi}.`, error)
   }
 
   /** Largeur utile pour les colonnes — même marge que `sizeColumnsToFit()`. */
@@ -1458,6 +1632,17 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.overlay.replaceChildren()
     const count = this.cache.getRowCount()
 
+    // Les préférences arrivent encore : rien n'a été demandé au serveur, donc
+    // « Aucune ligne » serait faux. On annonce un chargement.
+    if (this.stateLoading) {
+      this.overlay.className = `${NS}-overlay ${NS}-visible`
+      this.overlay.append(el('div', {
+        class: `${NS}-overlay-box`,
+        children: [this.ctx.icon('spinner'), el('span', { text: this.t.t('loading') })],
+      }))
+      return
+    }
+
     if (this.lastError) {
       this.overlay.className = `${NS}-overlay ${NS}-visible`
       this.overlay.append(el('div', {
@@ -1611,7 +1796,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   private emitState(): void {
+    // Pendant la restauration, l'état vient de l'hôte : le lui renvoyer ferait
+    // un aller-retour inutile, et un enregistrement pour rien.
+    if (this.restoringState) return
     this.options.onStateChange?.(this.getState())
+    this.persistState()
   }
 
   getColumns(): ColumnDef<TRow>[] {
@@ -1728,6 +1917,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * ou si la ligne n'est pas chargée — en mode serveur, on n'édite que ce qui
    * est à l'écran.
    */
+  /** Affiche une confirmation brève en bas de la grille. */
+  toast(message: string, options?: ToastOptions): void {
+    this.toastHost.show(message, options)
+  }
+
   startEditingCell(rowId: string, columnId: string): void {
     if (!this.options.editing) return
     this.stopEditing()
@@ -1822,6 +2016,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       this.stopEditing(true)
       e.cell.classList.add(`${NS}-cell-error`)
       setTimeout(() => e.cell.classList.remove(`${NS}-cell-error`), 2000)
+      /* La valeur est déjà revenue à ce qu'elle était ; sans un mot,
+         l'utilisateur croit avoir mal cliqué et recommence. */
+      const message = err instanceof Error ? err.message : String(err)
+      this.toastHost.show(message, { kind: 'error' })
       this.options.onError?.(err)
     }
   }
@@ -2111,10 +2309,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   destroy(): void {
+    // Le dernier geste de l'utilisateur — une colonne déplacée juste avant de
+    // quitter la page — serait perdu dans le délai de regroupement.
+    this.saveStateSoon?.cancel()
+    if (this.savePending) this.pushState()
+
     this.destroyed = true
     if (this.scrollFrame) cancelAnimationFrame(this.scrollFrame)
     this.contextMenu?.close()
     this.rowActionsMenu?.close()
+    this.toastHost?.destroy()
     this.detailObserver?.disconnect()
     this.resizeObserver?.disconnect()
     this.themeMediaQuery?.removeEventListener('change', this.onSystemTheme)

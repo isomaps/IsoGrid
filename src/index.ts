@@ -34,6 +34,8 @@ export { createLivewireDatasource } from './adapters/livewire'
 export type { LivewireDatasourceOptions, WireProxy } from './adapters/livewire'
 
 export { ClientDatasource } from './datasource/client'
+export { createHttpStateStore, createLocalStateStore } from './core/state-store'
+export type { GridStateStore, HttpStateStoreOptions } from './core/state-store'
 export { BlockCache, createHttpDatasource } from './datasource/server'
 export type { HttpDatasourceOptions } from './datasource/server'
 

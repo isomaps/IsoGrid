@@ -1,5 +1,8 @@
 import { IsoGrid } from '../ui/grid'
 import { createLivewireDatasource, type WireProxy } from './livewire'
+import {
+  createHttpStateStore, createLocalStateStore, isPromiseLike, type GridStateStore,
+} from '../core/state-store'
 import type { AnyRow, GridState, IsoGridOptions } from '../core/types'
 
 /**
@@ -18,7 +21,7 @@ import type { AnyRow, GridState, IsoGridOptions } from '../core/types'
  * branchement automatique sur `$wire`.
  */
 
-export interface IsoGridAlpineConfig extends Omit<IsoGridOptions<AnyRow>, 'datasource'> {
+export interface IsoGridAlpineConfig extends Omit<IsoGridOptions<AnyRow>, 'datasource' | 'stateStore'> {
   /**
    * Nom du paramètre d'URL où refléter l'état (filtres, tri, recherche).
    *
@@ -40,8 +43,28 @@ export interface IsoGridAlpineConfig extends Omit<IsoGridOptions<AnyRow>, 'datas
   /**
    * Clé de persistance dans `localStorage`. L'état (colonnes, tri, filtres)
    * y est relu au montage et réécrit à chaque changement.
+   *
+   * Per-navigateur et per-poste : pour que l'utilisateur retrouve ses réglages
+   * ailleurs, lui préférer `stateUrl` (ou `stateStore`).
    */
   persistKey?: string
+
+  /**
+   * Point d'entrée qui garde l'état côté hôte : GET pour le relire, POST
+   * `{ key, state }` pour l'écrire. L'utilisateur retrouve alors ses colonnes
+   * et ses filtres depuis n'importe quel poste.
+   *
+   * `persistKey` sert ici de discriminant quand plusieurs grilles partagent le
+   * même point d'entrée.
+   */
+  stateUrl?: string
+
+  /**
+   * Dépôt d'état complet. Depuis Blade, `load` et `save` s'y déclarent comme
+   * ailleurs : par NOM de fonction globale, PHP ne sérialisant pas de
+   * fonction. Chacune reçoit `$wire` en dernier argument.
+   */
+  stateStore?: GridStateStore | { load?: string; save?: string; debounce?: number; loadTimeout?: number }
 
   /** URL d'un ExcelJS embarqué, pour les hôtes qui ne résolvent pas les identifiants nus. */
   excelJsUrl?: string
@@ -75,26 +98,27 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
     mount(this: AlpineComponent) {
       const cfg = this.config
 
-      // L'URL prime sur le stockage local : un lien partagé doit montrer ce
+      // L'URL prime sur le dépôt d'état : un lien partagé doit montrer ce
       // qu'il promet.
       const { fs: fsUrl, ...etatUrl } = (cfg.urlParam ? readUrlState(cfg.urlParam) : undefined) ?? {}
 
       // `Object.keys` et non un simple `??` : une URL qui ne porte QUE le
       // plein écran laisserait sinon un état vide écraser les filtres retenus
-      // dans le stockage local — la grille s'ouvrirait en grand et remise à
-      // zéro, ce que le lien ne promettait pas.
-      const restored = (Object.keys(etatUrl).length > 0 ? etatUrl as Partial<GridState> : undefined)
-        ?? (cfg.persistKey ? readState(cfg.persistKey) : undefined)
+      // dans le dépôt — la grille s'ouvrirait en grand et remise à zéro, ce
+      // que le lien ne promettait pas.
+      const etatDuLien = Object.keys(etatUrl).length > 0 ? etatUrl as Partial<GridState> : undefined
 
       this.pleinEcran = fsUrl === 1
-      this.dernierEtat = restored ?? {}
+      this.dernierEtat = etatDuLien ?? {}
 
       // `onStateChange` n'est pas enveloppé ici : il peut encore être un NOM
       // de fonction à ce stade. La persistance s'y greffe plus bas, une fois
-      // les rappels résolus.
+      // les rappels résolus. `stateStore` est repris plus bas pour la même
+      // raison : depuis Blade il peut porter des NOMS de fonction.
       const options: IsoGridOptions<AnyRow> = {
         ...cfg,
-        initialState: restored ?? cfg.initialState,
+        stateStore: undefined,
+        initialState: etatDuLien ?? cfg.initialState,
       }
 
       if (cfg.source === 'livewire') {
@@ -164,21 +188,64 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
           (...args: unknown[]) => fn(...args, this.$wire)
       }
 
-      // La persistance enveloppe `onStateChange` : elle doit venir APRÈS la
-      // résolution ci-dessus, sinon elle appellerait la chaîne au lieu de la
-      // fonction.
+      // La persistance dans l'URL enveloppe `onStateChange` : elle doit venir
+      // APRÈS la résolution ci-dessus, sinon elle appellerait la chaîne au
+      // lieu de la fonction.
       const suiteEtat = options.onStateChange
       options.onStateChange = (state) => {
         this.dernierEtat = state
-        if (cfg.persistKey) writeState(cfg.persistKey, state)
         if (cfg.urlParam) writeUrlState(cfg.urlParam, state, this.pleinEcran)
         suiteEtat?.(state)
+      }
+
+      // Où ranger les préférences d'affichage. Trois écritures possibles, de
+      // la plus explicite à la plus ancienne ; `persistKey` seul garde son
+      // comportement historique, le localStorage du navigateur.
+      const brutStore = cfg.stateStore as Record<string, unknown> | undefined
+      if (brutStore) {
+        const store: GridStateStore = { ...(brutStore as GridStateStore) }
+        if (typeof brutStore.load === 'string') {
+          const fn = resoudre(brutStore.load, 'la lecture de l\'état')
+          store.load = () => fn(this.$wire) as never
+        }
+        if (typeof brutStore.save === 'string') {
+          const fn = resoudre(brutStore.save, 'l\'enregistrement de l\'état')
+          store.save = (state) => fn(state, this.$wire) as never
+        }
+        options.stateStore = store
+      } else if (cfg.stateUrl) {
+        options.stateStore = createHttpStateStore({ url: cfg.stateUrl, key: cfg.persistKey })
+      } else if (cfg.persistKey) {
+        options.stateStore = createLocalStateStore(cfg.persistKey)
+      }
+
+      // Un lien qui porte une vue l'emporte sur le dépôt pour ce qu'il
+      // transporte (filtres, tri, recherche) ; le dépôt garde la main sur la
+      // mise en page personnelle (colonnes, largeurs), que l'URL ne porte pas.
+      if (etatDuLien && options.stateStore?.load) {
+        const lire = options.stateStore.load
+        const fusion = (retenu: Partial<GridState> | null | undefined): Partial<GridState> => {
+          if (!retenu) return etatDuLien
+          const { filters: _f, sort: _s, quickFilter: _q, ...miseEnPage } = retenu
+          return { ...miseEnPage, ...etatDuLien }
+        }
+        options.stateStore = {
+          ...options.stateStore,
+          load: () => {
+            const lu = lire()
+            return isPromiseLike<Partial<GridState> | null | undefined>(lu)
+              ? Promise.resolve(lu).then(fusion)
+              : fusion(lu)
+          },
+        }
       }
 
       const suiteFs = options.onFullscreenChange
       options.onFullscreenChange = (actif) => {
         this.pleinEcran = actif
-        if (cfg.urlParam) writeUrlState(cfg.urlParam, this.dernierEtat, actif)
+        // L'état courant de la grille et non le dernier reçu : un état relu
+        // du dépôt n'est pas renvoyé par `onStateChange`.
+        if (cfg.urlParam) writeUrlState(cfg.urlParam, this.grid?.getState() ?? this.dernierEtat, actif)
         suiteFs?.(actif)
       }
 
@@ -234,22 +301,6 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
   }
 }
 
-function readState(key: string): Partial<GridState> | undefined {
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return undefined
-    // La recherche est ignorée à la LECTURE aussi, et pas seulement à
-    // l'écriture : un état déjà stocké avant ce correctif en contient un, et
-    // il ressusciterait une fois de plus au prochain chargement.
-    const { quickFilter: _recherche, ...etat } = JSON.parse(raw) as Partial<GridState>
-    return etat
-  } catch {
-    // Stockage indisponible (mode privé, quota) : on démarre sur l'état par
-    // défaut plutôt que d'empêcher la grille de s'afficher.
-    return undefined
-  }
-}
-
 /**
  * Ce qui va dans l'URL : filtres, tri, recherche.
  *
@@ -302,27 +353,6 @@ function writeUrlState(param: string, state: Partial<GridState>, pleinEcran = fa
     window.history.replaceState(window.history.state, '', url)
   } catch {
     /* silencieux : le reflet dans l'URL est un confort */
-  }
-}
-
-/**
- * Ce qui va dans le stockage local : tout l'état SAUF la recherche.
- *
- * Un terme de recherche est transitoire — il répond à une question posée à
- * l'instant, pas à une préférence d'affichage. Retenu, il rouvre la page des
- * jours plus tard en cachant 90 % des lignes, et rien à l'écran ne dit
- * pourquoi : on croit à une perte de données. Vécu le 23/09/2026 sur le
- * rapprochement bancaire, où « 164 lignes à rapprocher » en affichait 15.
- *
- * La recherche reste dans l'URL, où elle est explicite : elle s'y lit, s'y
- * partage et s'efface en enlevant le paramètre.
- */
-function writeState(key: string, state: GridState): void {
-  try {
-    const { quickFilter: _recherche, ...persistable } = state
-    localStorage.setItem(key, JSON.stringify(persistable))
-  } catch {
-    /* silencieux : la persistance est un confort, pas une fonction critique */
   }
 }
 

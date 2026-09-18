@@ -302,6 +302,67 @@ grid.setLocale('de') / setTheme('dark') / destroy()
 des colonnes conservées (ordre, épinglage, largeurs, filtres) et en purgeant
 celui des colonnes disparues.
 
+## Persistance de l'état
+
+L'état — ordre et largeur des colonnes, épinglages, tri, filtres, groupage —
+est sérialisable (`getState()`), et se repose tel quel (`setState()`). Reste à
+le ranger quelque part.
+
+`onStateChange` laisse l'hôte s'en charger lui-même. L'option **`stateStore`**
+va plus loin : elle confie à la grille la lecture ET l'écriture, y compris
+**asynchrones**, donc côté serveur.
+
+```ts
+new IsoGrid(el, {
+  columns: [...],
+  stateStore: {
+    load: () => fetch('/mes-grilles/factures').then(r => r.json()),
+    save: (state) => fetch('/mes-grilles/factures', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    }).then(() => undefined),
+  },
+})
+```
+
+Un point d'entrée HTTP qui répond à cette forme se déclare en une ligne :
+
+```ts
+stateStore: createHttpStateStore({ url: '/mes-grilles', key: 'factures' })
+```
+
+et le `localStorage` historique reste disponible sous la même interface :
+
+```ts
+stateStore: createLocalStateStore('ma-grille')
+```
+
+Ce que la grille garantit :
+
+- **Pas de clignotement.** Un `load` qui répond tout de suite (localStorage,
+  cache mémoire) est appliqué avant le premier rendu : la grille se monte déjà
+  triée et filtrée. Un `load` asynchrone **retarde le premier chargement de
+  données** — la grille affiche « Chargement… », puis se dessine une seule fois,
+  au lieu de charger les lignes avec le mauvais tri pour les recharger juste
+  après. Garde-fou : passé `loadTimeout` (5 s par défaut) elle démarre sans les
+  préférences, et les applique si elles finissent par arriver.
+- **Pas une écriture par frappe.** Les changements rapprochés sont regroupés
+  (`debounce`, 800 ms par défaut) : redimensionner une colonne produit des
+  dizaines de changements par seconde, pas des dizaines de requêtes. Deux
+  enregistrements ne se croisent jamais, et le dernier en attente part au
+  démontage — sinon la colonne déplacée juste avant de quitter la page serait
+  perdue.
+- **Une panne réseau ne casse rien.** Un échec de lecture démarre la grille sur
+  ses valeurs par défaut ; un échec d'écriture est signalé à `onError` (ou
+  averti une fois en console) puis oublié. Une préférence d'affichage qui ne
+  s'enregistre pas ne doit jamais empêcher de travailler.
+
+Ce qui vient du dépôt l'emporte sur `initialState`. `onStateChange` continue
+d'être appelé en plus, pour les hôtes qui veulent faire les deux — sauf pendant
+la restauration : la grille ne renvoie pas à l'hôte ce qu'il vient de lui
+donner.
+
 ## Thème
 
 Tout passe par des variables CSS sur `.isg-root` :
@@ -603,8 +664,25 @@ Trois cibles, du socle au plus intégré.
      x-init="mount()" style="height: 70vh"></div>
 ```
 
-`persistKey` sauvegarde l'état dans `localStorage`. Alpine appelle lui-même
-`destroy()` au démontage.
+`persistKey` sauvegarde l'état dans `localStorage` ; `stateUrl` l'envoie à un
+point d'entrée, et les réglages suivent alors l'utilisateur d'un poste à
+l'autre (`persistKey` sert alors de discriminant entre plusieurs grilles).
+Alpine appelle lui-même `destroy()` au démontage.
+
+```blade
+<div x-data="isogrid({ columns: @js($columns), source: '/mon/endpoint',
+                       stateUrl: '/mes-grilles', persistKey: 'factures' })"
+     x-init="mount()" style="height: 70vh"></div>
+```
+
+Depuis Blade, `stateStore.load` et `stateStore.save` acceptent aussi un **nom
+de fonction globale**, comme les autres points d'extension — ce qui permet de
+lire et d'écrire l'état par le composant Livewire porteur, sans route dédiée :
+
+```js
+window.chargerEtat = (wire) => wire.etatGrille()
+window.enregistrerEtat = (state, wire) => wire.enregistrerEtatGrille(state)
+```
 
 ### Déclarer des fonctions depuis Blade
 
