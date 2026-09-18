@@ -9,15 +9,24 @@
  * Volontairement fugace et sans bouton : ce n'est pas une décision à prendre,
  * c'est un accusé de réception. Ce qui demande une action de l'utilisateur
  * mérite un vrai dialogue, pas ceci.
+ *
+ * D'où trois issues à distinguer, et non deux : c'est fait, c'est fait mais
+ * lisez, c'est refusé. Sans le niveau du milieu, un hôte qui reçoit de son
+ * serveur « enregistré, avec une réserve » doit choisir entre la taire et la
+ * déguiser en erreur — et la réserve porte souvent ce qui compte le plus.
  */
 
 import { NS, el } from './dom'
 
-export type ToastKind = 'success' | 'error' | 'info'
+export type ToastKind = 'success' | 'error' | 'warning' | 'info'
 
 export interface ToastOptions {
   kind?: ToastKind
-  /** Durée d'affichage, en ms. Défaut : 1600, 3000 pour une erreur. */
+  /**
+   * Durée d'affichage, en ms. Défaut : 1600 ; 3000 pour une erreur et 5000
+   * pour un avertissement, qui annonce une écriture FAITE dont il faut
+   * pourtant retenir quelque chose — on ne peut pas la rejouer pour relire.
+   */
   duration?: number
 }
 
@@ -36,8 +45,11 @@ export class ToastHost {
   show(message: string, options: ToastOptions = {}): void {
     const kind = options.kind ?? 'success'
     /* Une erreur reste plus longtemps : elle demande à être lue, pas seulement
-       aperçue du coin de l'œil. */
-    const duration = options.duration ?? (kind === 'error' ? 3000 : 1600)
+       aperçue du coin de l'œil. Un avertissement davantage encore : l'erreur
+       laisse une trace — le geste a échoué, on le refait — alors que
+       l'avertissement accompagne une écriture réussie, et ne repassera pas. */
+    const duration = options.duration ??
+      (kind === 'warning' ? 5000 : kind === 'error' ? 3000 : 1600)
 
     /* Un seul message à la fois : deux enregistrements rapprochés ne doivent
        pas empiler deux bulles l'une sur l'autre. */
@@ -45,10 +57,11 @@ export class ToastHost {
 
     const node = el('div', {
       class: [`${NS}-toast`, kind === 'error' ? `${NS}-toast-error` : '',
+              kind === 'warning' ? `${NS}-toast-warning` : '',
               kind === 'info' ? `${NS}-toast-info` : ''].filter(Boolean).join(' '),
       attrs: { role: 'status', 'aria-live': kind === 'error' ? 'assertive' : 'polite' },
       children: [
-        this.icon(kind === 'error' ? 'warning' : 'check'),
+        this.icon(kind === 'error' || kind === 'warning' ? 'warning' : 'check'),
         el('span', { text: message }),
       ],
     })

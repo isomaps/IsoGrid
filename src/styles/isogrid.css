@@ -31,6 +31,8 @@
   --isg-accent-soft: #dbeafe;
 
   --isg-danger: #dc2626;
+  /* Assez sombre pour porter du texte blanc : un avertissement se lit. */
+  --isg-warning: #b45309;
 
   /* Formes */
   --isg-radius: 8px;
@@ -827,6 +829,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   --isg-accent: #2563eb;
   --isg-accent-soft: #dbeafe;
   --isg-danger: #dc2626;
+  --isg-warning: #b45309;
   --isg-radius: 8px;
   --isg-radius-sm: 5px;
   --isg-font: inherit;
@@ -1075,6 +1078,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   animation: isg-toast-in .18s ease-out;
 }
 .isg-toast-error { background: var(--isg-danger, #dc2626); }
+.isg-toast-warning { background: var(--isg-warning, #b45309); }
 .isg-toast .isg-icon { font-size: 14px; }
 
 .isg-toast-out {
