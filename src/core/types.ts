@@ -710,6 +710,20 @@ export interface IsoGridOptions<TRow = AnyRow> {
    */
   stateStore?: import('./state-store').GridStateStore
 
+  /**
+   * Classes CSS supplémentaires à poser sur une ligne, d'après son contenu.
+   *
+   * Une grille montre des données ; l'hôte, lui, sait ce qu'elles signifient —
+   * une commande en retard, un lot non conforme, un enregistrement verrouillé.
+   * Sans ce point d'accroche, cette information ne peut vivre que dans une
+   * cellule, alors qu'elle qualifie la ligne entière et doit se voir d'un coup
+   * d'œil sur toute sa largeur.
+   *
+   * Les classes viennent en plus de celles de la grille, jamais à leur place :
+   * la sélection et l'alternance continuent de s'afficher.
+   */
+  getRowClass?: (row: TRow, index: number) => string | string[] | null | undefined
+
   onRowClick?: (row: TRow, index: number, event: MouseEvent) => void
   onRowDoubleClick?: (row: TRow, index: number, event: MouseEvent) => void
   onCellClick?: (ctx: CellContext<TRow>, event: MouseEvent) => void

@@ -1244,6 +1244,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         index % 2 === 1 ? `${NS}-row-odd` : '',
         row ? '' : `${NS}-row-loading`,
         selected ? `${NS}-row-selected` : '',
+        /* Ce que l'hôte veut marquer : un statut, une alerte, une couleur
+           métier. Ajouté après les classes de la grille, jamais à leur place. */
+        ...(row ? this.classesHote(row, index) : []),
       ].filter(Boolean).join(' '),
       attrs: {
         role: 'row',
@@ -1579,6 +1582,21 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * cochée, mais seulement sur les lignes chargées : on ne peut pas cocher ce
    * qu'on n'a pas.
    */
+  /** Classes posées par l'hôte sur une ligne — voir `getRowClass`. */
+  private classesHote(row: TRow, index: number): string[] {
+    const f = this.options.getRowClass
+    if (!f) return []
+    try {
+      const c = f(row, index)
+      if (!c) return []
+      return (Array.isArray(c) ? c : [c]).filter(Boolean)
+    } catch {
+      /* Une classe est de l'ornement : si l'hôte se trompe, la ligne s'affiche
+         quand même. */
+      return []
+    }
+  }
+
   private applySelectionClick(row: TRow, rowIndex: number, extend: boolean): void {
     const id = this.rowId(row, rowIndex)
 
