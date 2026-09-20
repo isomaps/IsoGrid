@@ -107,7 +107,47 @@ export class Toolbar {
       }))
     }
 
+    // Dernier de la liste : c'est le bouton qui change le moins souvent d'avis
+    // (on l'active ou pas, une fois, sur la grille) — les autres, plus
+    // fréquents, restent groupés à sa gauche.
+    if (this.options.fullscreenButton === true) {
+      this.right.append(this.buildFullscreenButton())
+    }
+
     this.element.append(left, this.right)
+  }
+
+  private buildFullscreenButton(): HTMLElement {
+    const t = this.ctx.t
+    const isFs = this.ctx.api.isFullscreen()
+
+    return el('button', {
+      class: `${NS}-icon-btn ${NS}-fullscreen-btn`,
+      attrs: {
+        type: 'button',
+        title: t.t(isFs ? 'exitFullscreen' : 'fullscreen'),
+        'aria-label': t.t(isFs ? 'exitFullscreen' : 'fullscreen'),
+      },
+      children: [this.ctx.icon(isFs ? 'fullscreen-exit' : 'fullscreen')],
+      on: { click: () => this.ctx.api.toggleFullscreen() },
+    })
+  }
+
+  /**
+   * Reflete l'etat courant sur le bouton sans reconstruire toute la barre :
+   * une reconstruction perdrait le focus/la frappe en cours dans la recherche
+   * rapide. Meme esprit que `syncFilterCount()`.
+   */
+  syncFullscreenButton(): void {
+    const btn = this.right?.querySelector<HTMLElement>(`.${NS}-fullscreen-btn`)
+    if (!btn) return
+
+    const t = this.ctx.t
+    const isFs = this.ctx.api.isFullscreen()
+    btn.replaceChildren(this.ctx.icon(isFs ? 'fullscreen-exit' : 'fullscreen'))
+    const label = t.t(isFs ? 'exitFullscreen' : 'fullscreen')
+    btn.setAttribute('title', label)
+    btn.setAttribute('aria-label', label)
   }
 
   /** Remet la valeur affichée en phase avec l'état (restauration, `setState`). */

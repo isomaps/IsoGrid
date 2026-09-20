@@ -8,7 +8,7 @@ import type { LocaleCode } from './types'
 export type MessageKey =
   | 'search' | 'quickFilterPlaceholder' | 'noRows' | 'loading' | 'loadingError' | 'retry'
   | 'rows' | 'rowsFiltered' | 'of' | 'selected'
-  | 'columns' | 'filters' | 'sidebar' | 'closeSidebar'
+  | 'columns' | 'filters' | 'sidebar' | 'closeSidebar' | 'fullscreen' | 'exitFullscreen'
   | 'showAll' | 'hideAll' | 'searchColumns' | 'noColumnMatch'
   | 'pinStart' | 'pinEnd' | 'unpin' | 'pinned' | 'reorderColumn'
   | 'sortAsc' | 'sortDesc' | 'clearSort' | 'autoSize' | 'hideColumn'
@@ -55,6 +55,8 @@ const fr: Catalog = {
   filters: 'Filtres',
   sidebar: 'Panneau latéral',
   closeSidebar: 'Fermer le panneau',
+  fullscreen: 'Plein écran',
+  exitFullscreen: 'Quitter le plein écran',
   showAll: 'Tout afficher',
   hideAll: 'Tout masquer',
   searchColumns: 'Filtrer les colonnes…',
@@ -149,6 +151,8 @@ const en: Catalog = {
   filters: 'Filters',
   sidebar: 'Side panel',
   closeSidebar: 'Close panel',
+  fullscreen: 'Full screen',
+  exitFullscreen: 'Exit full screen',
   showAll: 'Show all',
   hideAll: 'Hide all',
   searchColumns: 'Filter columns…',
@@ -243,6 +247,8 @@ const de: Catalog = {
   filters: 'Filter',
   sidebar: 'Seitenleiste',
   closeSidebar: 'Seitenleiste schließen',
+  fullscreen: 'Vollbild',
+  exitFullscreen: 'Vollbild beenden',
   showAll: 'Alle anzeigen',
   hideAll: 'Alle ausblenden',
   searchColumns: 'Spalten filtern…',
@@ -337,6 +343,8 @@ const es: Catalog = {
   filters: 'Filtros',
   sidebar: 'Panel lateral',
   closeSidebar: 'Cerrar el panel',
+  fullscreen: 'Pantalla completa',
+  exitFullscreen: 'Salir de pantalla completa',
   showAll: 'Mostrar todo',
   hideAll: 'Ocultar todo',
   searchColumns: 'Filtrar columnas…',
@@ -431,6 +439,8 @@ const it: Catalog = {
   filters: 'Filtri',
   sidebar: 'Pannello laterale',
   closeSidebar: 'Chiudi il pannello',
+  fullscreen: 'Schermo intero',
+  exitFullscreen: 'Esci da schermo intero',
   showAll: 'Mostra tutto',
   hideAll: 'Nascondi tutto',
   searchColumns: 'Filtra le colonne…',
@@ -525,6 +535,8 @@ const nl: Catalog = {
   filters: 'Filters',
   sidebar: 'Zijpaneel',
   closeSidebar: 'Paneel sluiten',
+  fullscreen: 'Volledig scherm',
+  exitFullscreen: 'Volledig scherm sluiten',
   showAll: 'Alles tonen',
   hideAll: 'Alles verbergen',
   searchColumns: 'Kolommen filteren…',
@@ -619,6 +631,8 @@ const pl: Catalog = {
   filters: 'Filtry',
   sidebar: 'Panel boczny',
   closeSidebar: 'Zamknij panel',
+  fullscreen: 'Pełny ekran',
+  exitFullscreen: 'Zamknij pełny ekran',
   showAll: 'Pokaż wszystkie',
   hideAll: 'Ukryj wszystkie',
   searchColumns: 'Filtruj kolumny…',
@@ -713,6 +727,8 @@ const ru: Catalog = {
   filters: 'Фильтры',
   sidebar: 'Боковая панель',
   closeSidebar: 'Закрыть панель',
+  fullscreen: 'Полный экран',
+  exitFullscreen: 'Выйти из полноэкранного режима',
   showAll: 'Показать все',
   hideAll: 'Скрыть все',
   searchColumns: 'Фильтровать столбцы…',

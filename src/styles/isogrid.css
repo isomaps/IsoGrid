@@ -77,6 +77,19 @@
    gris en haut de la grille. */
 .isg-root.isg-headerless .isg-header { display: none; }
 
+/* Plein écran (`toggleFullscreen()`) : recouvre toute la page, au-dessus de
+   tout le reste — un panneau Filament ou une modale hôte compris. La
+   racine porte déjà `background`/`border-radius`/`box-shadow` par ses
+   variables `--isg-*` : on écrase seulement la géométrie. */
+.isg-root.isg-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .isg-root *,
 .isg-root *::before,
 .isg-root *::after { box-sizing: border-box; }

@@ -297,6 +297,22 @@ export interface ToolbarOptions {
   columnsButton?: boolean
   /** @deprecated remplacé par `filtersButton` / `columnsButton`. */
   sidebarButton?: boolean
+  /**
+   * Bouton « plein écran » (icône seule, dernier de la barre). Défaut : `false`.
+   *
+   * Opt-in comme `exportButton` : la plupart des grilles vivent dans une mise
+   * en page déjà dimensionnée pour elles (panneau Filament, page dédiée), où
+   * agrandir n'apporte rien. À activer quand la grille est à l'étroit dans
+   * son conteneur habituel (beaucoup de colonnes, lignes de détail) et qu'un
+   * agrandissement ponctuel aide vraiment à travailler dedans.
+   *
+   * Bascule en CSS (`position: fixed` sur la racine, pas l'API Fullscreen du
+   * navigateur) : marche dans un iframe ou un contexte qui refuse
+   * `requestFullscreen()`, et laisse `Échap` fermer sans dépendre du
+   * navigateur. Le `ResizeObserver` déjà posé sur le viewport recalcule seul
+   * les lignes visibles et la largeur des colonnes.
+   */
+  fullscreenButton?: boolean
   /** Nœuds libres injectés à gauche de la barre d'outils. */
   slot?: () => Node | null
 }
@@ -529,6 +545,7 @@ export type IconName =
   | 'copy' | 'copy-row' | 'copy-table'
   | 'check' | 'chevron-down' | 'chevron-right'
   | 'eye' | 'eye-off' | 'grip' | 'spinner' | 'warning'
+  | 'fullscreen' | 'fullscreen-exit'
 
 /* ------------------------------------------------------------------------ */
 /* API publique de l'instance                                                */
@@ -616,5 +633,11 @@ export interface IsoGridApi<TRow = AnyRow> {
   setLocale(locale: LocaleCode): void
   setTheme(theme: ThemeMode): void
   sizeColumnsToFit(): void
+
+  /* --- plein écran --- */
+  isFullscreen(): boolean
+  /** Bascule ; sans effet si `toolbar.fullscreenButton` n'a jamais été activé côté options — l'icône n'existerait pas, mais l'appel programmatique reste possible. */
+  toggleFullscreen(): void
+
   destroy(): void
 }

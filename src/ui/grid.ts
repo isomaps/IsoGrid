@@ -72,6 +72,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private lastError: unknown = null
   private themeMediaQuery?: MediaQueryList
   private resizeObserver?: ResizeObserver
+  /** Plein écran (bascule CSS, cf. `toggleFullscreen`) — jamais persisté dans `GridState`. */
+  private isFs = false
 
   constructor(container: HTMLElement, options: IsoGridOptions<TRow>) {
     this.options = options
@@ -149,6 +151,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.columnModel.setAvailableWidth(this.usableWidth())
     this.render()
     this.refreshVisibleRange()
+
+    // Un seul écouteur global, posé une fois — pas seulement quand le bouton
+    // est actif : `toggleFullscreen()` reste appelable par programme même sans
+    // `toolbar.fullscreenButton`, et Échap doit alors marcher aussi.
+    document.addEventListener('keydown', this.onKeyDown)
   }
 
   /** Largeur utile pour les colonnes — même marge que `sizeColumnsToFit()`. */
@@ -1281,6 +1288,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   private onSystemTheme = (): void => { /* les tokens CSS suivent la media query */ }
 
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (this.isFs && e.key === 'Escape') {
+      e.preventDefault()
+      this.toggleFullscreen()
+    }
+  }
+
   /* ==================================================================== */
   /* API publique                                                          */
   /* ==================================================================== */
@@ -1652,6 +1666,27 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.applyTheme(theme)
   }
 
+  /* --- plein écran --- */
+
+  isFullscreen(): boolean {
+    return this.isFs
+  }
+
+  /**
+   * Bascule en CSS (`position: fixed` sur la racine), pas l'API Fullscreen du
+   * navigateur : celle-ci exige un geste utilisateur ET l'autorisation de
+   * l'hôte (`allow="fullscreen"` en iframe, refusée par défaut dans nombre de
+   * panneaux d'admin) — une bascule CSS marche partout, sans permission à
+   * négocier. Le `ResizeObserver` posé sur le viewport (cf. `buildLayout`)
+   * recalcule seul les lignes visibles et la largeur des colonnes : aucun
+   * recalcul manuel n'est nécessaire ici.
+   */
+  toggleFullscreen(): void {
+    this.isFs = !this.isFs
+    this.root.classList.toggle(`${NS}-fullscreen`, this.isFs)
+    this.toolbar?.syncFullscreenButton()
+  }
+
   destroy(): void {
     this.destroyed = true
     if (this.scrollFrame) cancelAnimationFrame(this.scrollFrame)
@@ -1660,6 +1695,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.detailObserver?.disconnect()
     this.resizeObserver?.disconnect()
     this.themeMediaQuery?.removeEventListener('change', this.onSystemTheme)
+    document.removeEventListener('keydown', this.onKeyDown)
     this.cache.destroy()
     this.columnModel.destroy()
     this.root.remove()

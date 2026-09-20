@@ -149,6 +149,23 @@ visible :
 new IsoGrid(el, { toolbar: { exportButton: true } })
 ```
 
+## Plein écran
+
+Comme l'export, le bouton « plein écran » de la barre d'outils est **opt-in**,
+désactivé par défaut :
+
+```ts
+new IsoGrid(el, { toolbar: { fullscreenButton: true } })
+```
+
+Bascule en **CSS** (`position: fixed` sur la racine de la grille), pas l'API
+Fullscreen du navigateur : elle marche donc dans un iframe ou un panneau qui
+refuse `requestFullscreen()` (beaucoup le font). `Échap` referme, tout comme
+un second clic sur le bouton — état exposé par `api.isFullscreen()` et
+`api.toggleFullscreen()`, appelable sans le bouton (un raccourci clavier hôte,
+par exemple). Le `ResizeObserver` déjà posé sur le viewport recalcule seul les
+lignes visibles et la largeur des colonnes, sans code supplémentaire.
+
 ## Largeur des colonnes
 
 Par défaut, les colonnes **occupent toute la largeur** de la grille (`fillWidth: true`).
