@@ -132,7 +132,24 @@ export function setPath(obj: unknown, path: string, value: unknown): void {
  */
 export function onDismiss(target: HTMLElement, close: () => void): () => void {
   const onPointer = (e: PointerEvent) => {
-    if (!target.contains(e.target as Node)) close()
+    /*
+     * `composedPath()` et non `contains()`, a cause du shadow DOM.
+     *
+     * Quand la grille vit dans un composant a racine d'ombre, l'evenement
+     * qui atteint le document a pour cible l'HOTE, jamais l'element
+     * reellement clique : `contains()` repondait donc « dehors » pour un
+     * clic a l'interieur du flottant. Le panneau de filtre se fermait des
+     * qu'on touchait sa liste deroulante ou son champ de saisie — il etait
+     * inutilisable. `composedPath()` traverse les frontieres d'ombre et
+     * rend le vrai chemin.
+     *
+     * Repli sur `contains()` la ou `composedPath` manque : hors shadow DOM
+     * les deux disent la meme chose.
+     */
+    const path = typeof e.composedPath === 'function' ? e.composedPath() : []
+    const dedans = path.length ? path.includes(target)
+                               : target.contains(e.target as Node)
+    if (!dedans) close()
   }
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') { e.stopPropagation(); close() }
