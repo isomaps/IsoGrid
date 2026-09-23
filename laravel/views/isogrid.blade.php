@@ -3,7 +3,10 @@
 
     @param array  $columns    définitions de colonnes (tableau PHP -> JSON)
     @param string $source     'livewire' (défaut) ou une URL de point d'entrée
-    @param string $height     hauteur CSS du conteneur ; la grille remplit son parent
+    @param string $height     hauteur CSS du conteneur ; la grille remplit son parent.
+                              `fill` = s'etire jusqu'au bas de la fenetre et suit les
+                              redimensionnements (utile sur un ecran large, ou une
+                              hauteur fixe laisse du vide sous la grille).
     @param string $persistKey clé localStorage pour l'état (facultatif)
     @param string $locale     fr|en|de|es|it
     @param array  $options    options supplémentaires fusionnées telles quelles
@@ -71,7 +74,29 @@
         'locale' => $locale ?? app()->getLocale(),
         'excelJsUrl' => url('/vendor/isogrid/exceljs.js').'?v='.$isogridV,
     ], $options)))"
-    x-init="mount()"
+    @if (in_array($height, ['fill', 'auto'], true))
+        {{-- Hauteur fluide : on mesure la distance entre le haut du conteneur
+             et le bas de la fenetre. Une hauteur fixe en `calc(100vh - Xrem)`
+             suppose connue la hauteur de tout ce qui precede (fil d'Ariane,
+             actions, filtres) : elle laisse du vide sur un grand ecran et
+             coupe la grille sur un petit. Le plancher de 320 px evite une
+             grille inutilisable quand la page est deja longue. --}}
+        x-init="
+            mount();
+            $nextTick(() => {
+                const etirer = () => {
+                    const haut = $el.getBoundingClientRect().top + window.scrollY;
+                    const dispo = window.innerHeight - haut + window.scrollY - 24;
+                    $el.style.height = Math.max(320, Math.round(dispo)) + 'px';
+                };
+                etirer();
+                window.addEventListener('resize', etirer);
+                $el._isogridEtirer = etirer;
+            })
+        "
+    @else
+        x-init="mount()"
+    @endif
     {{-- `min-width: 0` n'est pas decoratif : le conteneur est souvent
          l'enfant d'un flex (une page Filament, une carte), et un enfant flex
          refuse par defaut de descendre sous la largeur de son contenu. La
@@ -79,7 +104,7 @@
          debordait a droite de l'ecran au lieu de defiler a l'interieur.
          `width: 100%` et `max-width: 100%` ferment le meme piege dans une
          grille CSS ou un bloc a largeur automatique. --}}
-    style="height: {{ $height }}; width: 100%; max-width: 100%; min-width: 0;"
+    style="height: {{ in_array($height, ['fill', 'auto'], true) ? 'auto' : $height }}; width: 100%; max-width: 100%; min-width: 0;"
     {{ $attributes }}
 ></div>
 {{-- Pas de `x-on:destroy` : Alpine appelle lui-même la méthode `destroy()`
