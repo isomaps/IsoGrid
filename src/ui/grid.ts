@@ -848,7 +848,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // « tout sauf ces trois-là » désignerait alors silencieusement d'autres
     // lignes. Un tri, lui, ne fait que réordonner — la sélection reste juste.
     const filterSignature = this.filterSignature()
-    if (filterSignature !== this.lastFilterSignature) {
+    const filtresChanges = filterSignature !== this.lastFilterSignature
+    if (filtresChanges) {
       this.lastFilterSignature = filterSignature
       this.selection.clear()
       this.lastSelectedIndex = null
@@ -857,7 +858,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const signature = this.dataSignature()
     if (signature !== this.lastDataSignature) {
       this.lastDataSignature = signature
-      this.reload()
+      // Un TRI seul ne touche pas aux intertitres : la colonne de decoupage
+      // est fixe et la source ordonne par elle en premier, donc les
+      // effectifs et l'ordre des sections restent identiques. Les redemander
+      // coutait une requete a chaque clic sur un en-tete.
+      this.reload({ gardeSections: !filtresChanges })
     } else {
       this.render()
     }
@@ -2078,7 +2083,17 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.refreshVisibleRange()
   }
 
-  reload(): void {
+  reload(options: { gardeSections?: boolean } = {}): void {
+    // Vider les intertitres AVANT de reconstruire le corps. Sinon, le temps
+    // que la nouvelle requete de sections revienne, les bandeaux du jeu
+    // PRECEDENT se posaient sur les lignes du nouveau — « Aout 2026 » coiffant
+    // des lignes de mars, apres un changement de filtre. Mieux vaut un corps
+    // sans intertitre pendant une fraction de seconde qu'un intertitre faux.
+    if (!options.gardeSections) {
+      this.sections = []
+      this.sectionStarts.clear()
+      this.sectionsSignature = null
+    }
     this.lastError = null
     this.cache.invalidate()
     this.cache.requestContext = this.buildRequestContext()
@@ -2099,9 +2114,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.renderStatus()
     this.renderFooter()
     this.renderOverlay()
-    // Les frontieres dependent des filtres : un rechargement les invalide.
-    this.sectionsSignature = null
-    void this.fetchSections()
+    // Les frontieres dependent des filtres et des donnees : un rechargement
+    // explicite (apres une modification, par exemple) les invalide.
+    if (!options.gardeSections) void this.fetchSections()
   }
 
   setRows(rows: TRow[]): void {
