@@ -450,6 +450,29 @@ export interface IsoGridOptions<TRow = AnyRow> {
   locale?: LocaleCode
   theme?: ThemeMode
 
+  /**
+   * La grille s'étire jusqu'au bas de la fenêtre et suit les
+   * redimensionnements. Défaut : `false` — la grille remplit son conteneur,
+   * dont l'hôte fixe la hauteur.
+   *
+   * Pourquoi une option et pas une simple hauteur en CSS : une hauteur fixe
+   * du genre `calc(100vh - 18rem)` suppose connue la hauteur de tout ce qui
+   * précède la grille (fil d'Ariane, titre, boutons, filtres). Elle laisse du
+   * vide sur un grand écran et coupe la grille sur un petit. Ici la distance
+   * est MESURÉE à chaque fois.
+   *
+   * À laisser à `false` quand la page place la grille dans un bloc déjà
+   * dimensionné, ou qu'elle en affiche plusieurs l'une sous l'autre : chacune
+   * réclamerait alors toute la hauteur restante.
+   */
+  autoHeight?: boolean
+
+  /** Hauteur minimale en mode `autoHeight`, quand la page est déjà longue. Défaut : 320. */
+  autoHeightMin?: number
+
+  /** Marge laissée sous la grille en mode `autoHeight`. Défaut : 24. */
+  autoHeightGap?: number
+
   rowHeight?: number
   headerHeight?: number
 

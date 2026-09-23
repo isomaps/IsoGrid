@@ -4,9 +4,10 @@
     @param array  $columns    définitions de colonnes (tableau PHP -> JSON)
     @param string $source     'livewire' (défaut) ou une URL de point d'entrée
     @param string $height     hauteur CSS du conteneur ; la grille remplit son parent.
-                              `fill` = s'etire jusqu'au bas de la fenetre et suit les
-                              redimensionnements (utile sur un ecran large, ou une
-                              hauteur fixe laisse du vide sous la grille).
+                              `fill` (ou `auto`) = s'etire jusqu'au bas de la fenetre et
+                              suit les redimensionnements — raccourci vers l'option
+                              `autoHeight` de la grille. Tout le reste est pris tel quel
+                              comme hauteur CSS.
     @param string $persistKey clé localStorage pour l'état (facultatif)
     @param string $urlParam   paramètre d'URL où refléter filtres/tri/recherche,
                               pour une vue partageable (facultatif)
@@ -76,7 +77,16 @@
 @endonce
 
 {{-- `wire:ignore` : sans lui, le prochain rendu Livewire remplacerait le DOM
-     construit par la grille et la ferait disparaître. --}}
+     construit par la grille et la ferait disparaître.
+
+     `height=fill` n'est qu'un raccourci vers l'option `autoHeight` de la
+     grille ; `$options` peut la porter directement, et la surcharge puisqu'il
+     est fusionné en dernier.
+
+     ⚠️ Aucun commentaire PHP à l'intérieur du `@js([...])` : il vit dans un
+     attribut HTML entre guillemets doubles, et le moindre guillemet dans un
+     commentaire referme l'attribut — la grille se retrouve alors montée avec
+     une configuration tronquée. --}}
 <div
     wire:ignore
     x-data="isogrid(@js(array_merge([
@@ -84,32 +94,15 @@
         'source' => $source,
         'persistKey' => $persistKey,
         'urlParam' => $urlParam,
+        'autoHeight' => in_array($height, ['fill', 'auto'], true),
         'locale' => $locale ?? app()->getLocale(),
         'excelJsUrl' => url('/vendor/isogrid/exceljs.js').'?v='.$isogridV,
     ], $options)))"
-    @if (in_array($height, ['fill', 'auto'], true))
-        {{-- Hauteur fluide : on mesure la distance entre le haut du conteneur
-             et le bas de la fenetre. Une hauteur fixe en `calc(100vh - Xrem)`
-             suppose connue la hauteur de tout ce qui precede (fil d'Ariane,
-             actions, filtres) : elle laisse du vide sur un grand ecran et
-             coupe la grille sur un petit. Le plancher de 320 px evite une
-             grille inutilisable quand la page est deja longue. --}}
-        x-init="
-            mount();
-            $nextTick(() => {
-                const etirer = () => {
-                    const haut = $el.getBoundingClientRect().top + window.scrollY;
-                    const dispo = window.innerHeight - haut + window.scrollY - 24;
-                    $el.style.height = Math.max(320, Math.round(dispo)) + 'px';
-                };
-                etirer();
-                window.addEventListener('resize', etirer);
-                $el._isogridEtirer = etirer;
-            })
-        "
-    @else
-        x-init="mount()"
-    @endif
+    {{-- L'etirement vers le bas de la fenetre est desormais tenu par la
+         grille elle-meme (option `autoHeight`) : il y a sa place, avec le
+         retrait de l'ecouteur au demontage et le respect du plein ecran, ce
+         qu'un `x-init` de vue ne savait pas faire. --}}
+    x-init="mount()"
     {{-- `min-width: 0` n'est pas decoratif : le conteneur est souvent
          l'enfant d'un flex (une page Filament, une carte), et un enfant flex
          refuse par defaut de descendre sous la largeur de son contenu. La

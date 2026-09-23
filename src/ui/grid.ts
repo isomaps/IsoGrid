@@ -74,6 +74,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private resizeObserver?: ResizeObserver
   /** Plein écran (bascule CSS, cf. `toggleFullscreen`) — jamais persisté dans `GridState`. */
   private isFs = false
+  /** Rappel d'etirement, garde pour pouvoir le retirer au demontage. */
+  private surRedimensionnementFenetre?: () => void
 
   /* --- sections (intertitres) --- */
   /** Frontieres et totaux fournis par la source, pour tout le jeu filtre. */
@@ -167,7 +169,39 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // `toolbar.fullscreenButton`, et Échap doit alors marcher aussi.
     document.addEventListener('keydown', this.onKeyDown)
 
+    this.installerAutoHeight(container)
+
     if (this.options.sections) void this.fetchSections()
+  }
+
+  /**
+   * Étire le conteneur jusqu'au bas de la fenêtre (option `autoHeight`).
+   *
+   * C'est le CONTENEUR qu'on dimensionne, pas la racine de la grille : celle-ci
+   * remplit son parent, et l'hôte garde la main sur les marges autour.
+   *
+   * Le `ResizeObserver` déjà posé sur le viewport recalcule seul les lignes
+   * visibles ; il n'y a donc rien à rafraîchir ici. Un second appel au cadre
+   * suivant rattrape les pages dont la hauteur bouge après le montage (barre
+   * d'actions, bandeau de filtres, polices).
+   */
+  private installerAutoHeight(container: HTMLElement): void {
+    if (!this.options.autoHeight) return
+
+    const plancher = this.options.autoHeightMin ?? 320
+    const marge = this.options.autoHeightGap ?? 24
+
+    const etirer = (): void => {
+      if (this.destroyed || this.isFs) return
+      const haut = container.getBoundingClientRect().top + window.scrollY
+      const dispo = window.innerHeight - haut + window.scrollY - marge
+      container.style.height = `${Math.max(plancher, Math.round(dispo))}px`
+    }
+
+    etirer()
+    requestAnimationFrame(etirer)
+    this.surRedimensionnementFenetre = etirer
+    window.addEventListener('resize', etirer)
   }
 
   /** Largeur utile pour les colonnes — même marge que `sizeColumnsToFit()`. */
@@ -1882,6 +1916,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.resizeObserver?.disconnect()
     this.themeMediaQuery?.removeEventListener('change', this.onSystemTheme)
     document.removeEventListener('keydown', this.onKeyDown)
+    if (this.surRedimensionnementFenetre) {
+      window.removeEventListener('resize', this.surRedimensionnementFenetre)
+    }
     this.cache.destroy()
     this.columnModel.destroy()
     this.root.remove()

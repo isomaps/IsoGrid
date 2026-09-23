@@ -149,6 +149,26 @@ visible :
 new IsoGrid(el, { toolbar: { exportButton: true } })
 ```
 
+## Hauteur : `autoHeight`
+
+```blade
+<x-isogrid :columns="[...]" height="fill" />          {{-- raccourci --}}
+<x-isogrid :columns="[...]" :options="['autoHeight' => true]" />
+```
+
+La grille s'étire jusqu'au bas de la fenêtre et suit les redimensionnements.
+Une hauteur fixe du genre `calc(100vh - 18rem)` suppose connue la hauteur de
+tout ce qui précède — fil d'Ariane, titre, boutons, filtres : elle laisse du
+vide sur un grand écran et coupe la grille sur un petit. Ici la distance est
+mesurée.
+
+`autoHeightMin` (défaut 320) plancher quand la page est déjà longue,
+`autoHeightGap` (défaut 24) marge laissée dessous.
+
+À laisser **désactivé** — c'est le défaut — quand la page place la grille dans
+un bloc déjà dimensionné, ou qu'elle en affiche plusieurs l'une sous l'autre :
+chacune réclamerait sinon toute la hauteur restante.
+
 ## L'état dans l'URL
 
 ```blade
