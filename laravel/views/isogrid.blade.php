@@ -8,6 +8,8 @@
                               redimensionnements (utile sur un ecran large, ou une
                               hauteur fixe laisse du vide sous la grille).
     @param string $persistKey clé localStorage pour l'état (facultatif)
+    @param string $urlParam   paramètre d'URL où refléter filtres/tri/recherche,
+                              pour une vue partageable (facultatif)
     @param string $locale     fr|en|de|es|it
     @param array  $options    options supplémentaires fusionnées telles quelles
 
@@ -23,6 +25,7 @@
     'source' => 'livewire',
     'height' => '70vh',
     'persistKey' => null,
+    'urlParam' => null,
     'locale' => null,
     'options' => [],
 ])
@@ -80,6 +83,7 @@
         'columns' => $columns,
         'source' => $source,
         'persistKey' => $persistKey,
+        'urlParam' => $urlParam,
         'locale' => $locale ?? app()->getLocale(),
         'excelJsUrl' => url('/vendor/isogrid/exceljs.js').'?v='.$isogridV,
     ], $options)))"

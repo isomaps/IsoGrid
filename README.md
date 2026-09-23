@@ -149,6 +149,27 @@ visible :
 new IsoGrid(el, { toolbar: { exportButton: true } })
 ```
 
+## L'état dans l'URL
+
+```blade
+<x-isogrid :columns="[...]" source="livewire"
+           persist-key="admin.factures.v3" url-param="g" />
+```
+
+Filtres, tri et recherche partent dans le paramètre nommé : la vue devient
+**partageable** et survit à un rechargement. Le `localStorage` garde l'état
+pour soi ; l'URL le transmet.
+
+Ce qui n'y va pas : la visibilité et la largeur des colonnes. C'est un réglage
+personnel, et un lien doit transmettre la question posée aux données, pas la
+mise en page de celui qui l'envoie.
+
+L'URL a **priorité** sur le stockage local — un lien reçu doit montrer ce
+qu'il promet, même si l'on avait laissé d'autres filtres en place la veille.
+L'écriture passe par `replaceState` : avec `pushState`, chaque frappe dans la
+recherche ajouterait une entrée d'historique et le bouton « retour »
+deviendrait inutilisable.
+
 ## Tags de filtres rapides
 
 Une grille d'administration a trois ou quatre questions qu'on lui pose dix
