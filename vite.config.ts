@@ -23,6 +23,10 @@ function emitStylesheet(): Plugin {
 
 export default defineConfig({
   plugins: [emitStylesheet()],
+  // table-core teste « process.env.NODE_ENV » pour ses avertissements de développement.
+  // En mode bibliothèque, Vite ne remplace pas cette expression : sans cette ligne, le
+  // bundle plante dans le navigateur (« process is not defined ») chez tout hôte sans build.
+  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
     lib: {
       entry: {
