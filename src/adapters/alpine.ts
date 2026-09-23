@@ -237,7 +237,12 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
 function readState(key: string): Partial<GridState> | undefined {
   try {
     const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) as Partial<GridState> : undefined
+    if (!raw) return undefined
+    // La recherche est ignorée à la LECTURE aussi, et pas seulement à
+    // l'écriture : un état déjà stocké avant ce correctif en contient un, et
+    // il ressusciterait une fois de plus au prochain chargement.
+    const { quickFilter: _recherche, ...etat } = JSON.parse(raw) as Partial<GridState>
+    return etat
   } catch {
     // Stockage indisponible (mode privé, quota) : on démarre sur l'état par
     // défaut plutôt que d'empêcher la grille de s'afficher.
