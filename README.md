@@ -163,7 +163,7 @@ new IsoGrid(el, {
       { id: 'a-traiter', label: 'À rapprocher', tone: 'danger',
         filters: { match_status: { type: 'set', conditions: [{ op: 'in', value: ['unmatched'] }] } } },
       { id: 'debits', label: 'Débits', tone: 'neutral',
-        filters: { amount: { type: 'number', conditions: [{ op: 'lessThan', value: 0 }] } } },
+        filters: { amount: { type: 'number', conditions: [{ op: 'lt', value: 0 }] } } },
     ],
   },
 })
