@@ -508,6 +508,42 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-status-count { font-variant-numeric: tabular-nums; }
 
 /* ==========================================================================
+   Tags de filtres rapides
+   ========================================================================== */
+
+.isg-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--isg-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--isg-fg-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.isg-tag:hover { background: var(--isg-bg-hover); color: var(--isg-fg); }
+.isg-tag:focus-visible { outline: 2px solid var(--isg-accent); outline-offset: 1px; }
+
+/* Un tag allumé doit se distinguer sans relire son libellé : c'est tout son
+   intérêt face au panneau de filtres. */
+.isg-tag-on {
+  border-color: transparent;
+  background: var(--isg-accent);
+  color: var(--isg-accent-fg);
+  font-weight: 500;
+}
+.isg-tag-on.isg-tag-success { background: #059669; }
+.isg-tag-on.isg-tag-warning { background: #b45309; }
+.isg-tag-on.isg-tag-danger  { background: #b91c1c; }
+.isg-tag-on.isg-tag-info    { background: #1d4ed8; }
+.isg-tag-on.isg-tag-neutral { background: #475569; }
+
+/* ==========================================================================
    Panneau latéral
    ========================================================================== */
 

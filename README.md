@@ -149,6 +149,33 @@ visible :
 new IsoGrid(el, { toolbar: { exportButton: true } })
 ```
 
+## Tags de filtres rapides
+
+Une grille d'administration a trois ou quatre questions qu'on lui pose dix
+fois par jour. Les poser par le panneau de filtres demande quatre clics ; un
+tag en demande un, et se relit d'un coup d'œil puisqu'il reste allumé tant
+qu'il s'applique.
+
+```ts
+new IsoGrid(el, {
+  toolbar: {
+    tags: [
+      { id: 'a-traiter', label: 'À rapprocher', tone: 'danger',
+        filters: { match_status: { type: 'set', conditions: [{ op: 'in', value: ['unmatched'] }] } } },
+      { id: 'debits', label: 'Débits', tone: 'neutral',
+        filters: { amount: { type: 'number', conditions: [{ op: 'lessThan', value: 0 }] } } },
+    ],
+  },
+})
+```
+
+Les tags se rendent **à gauche de la recherche**. Un clic applique, un second
+retire. Deux tags sur des colonnes différentes se cumulent ; deux tags sur la
+même colonne se remplacent — sinon le second n'aurait aucun effet visible et
+le tableau paraîtrait bloqué. Un tag s'allume aussi quand le même filtre a été
+saisi à la main dans le panneau : l'écran ne doit pas dire deux choses
+différentes du même état.
+
 ## Plein écran
 
 Comme l'export, le bouton « plein écran » de la barre d'outils est **opt-in**,

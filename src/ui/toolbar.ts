@@ -1,4 +1,4 @@
-import type { ToolbarOptions } from '../core/types'
+import type { ToolbarTag, ToolbarOptions } from '../core/types'
 import type { GridContext } from './context'
 import { NS, debounce, el, onDismiss, positionFloating } from './dom'
 
@@ -33,6 +33,11 @@ export class Toolbar {
     const left = el('div', { class: `${NS}-toolbar-left` })
     const slot = this.options.slot?.()
     if (slot) left.append(slot)
+
+    // Tags de filtres rapides, à gauche de la recherche.
+    for (const tag of this.options.tags ?? []) {
+      left.append(this.buildTag(tag))
+    }
 
     this.right = el('div', { class: `${NS}-toolbar-right` })
 
@@ -192,5 +197,44 @@ export class Toolbar {
     positionFloating(anchor, menu)
     dispose = onDismiss(menu, close)
     menu.querySelector<HTMLElement>('button')?.focus()
+  }
+
+  /**
+   * Un tag actif est un tag dont TOUTES les colonnes portent déjà exactement
+   * son filtre. On compare l'état normalisé et non l'objet d'origine : un
+   * filtre saisi à la main dans le panneau peut coïncider avec un tag, et
+   * dans ce cas le tag doit s'allumer — sinon l'écran dirait deux choses
+   * différentes du même état.
+   */
+  private tagEstActif(tag: ToolbarTag): boolean {
+    const etat = this.ctx.columns.getState().filters
+    const entrees = Object.entries(tag.filters)
+    if (entrees.length === 0) return false
+
+    return entrees.every(([colonne, modele]) =>
+      JSON.stringify(etat[colonne] ?? null) === JSON.stringify(modele))
+  }
+
+  private buildTag(tag: ToolbarTag): HTMLElement {
+    const actif = this.tagEstActif(tag)
+
+    return el('button', {
+      class: `${NS}-tag ${actif ? `${NS}-tag-on` : ''} ${tag.tone ? `${NS}-tag-${tag.tone}` : ''}`,
+      attrs: {
+        type: 'button',
+        'aria-pressed': actif ? 'true' : 'false',
+        ...(tag.title ? { title: tag.title } : {}),
+      },
+      text: tag.label,
+      on: {
+        click: () => {
+          const etaitActif = this.tagEstActif(tag)
+          for (const [colonne, modele] of Object.entries(tag.filters)) {
+            this.ctx.api.setFilter(colonne, etaitActif ? null : modele)
+          }
+          this.render()
+        },
+      },
+    })
   }
 }

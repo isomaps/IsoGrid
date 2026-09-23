@@ -256,10 +256,37 @@ export interface DataResponse<TRow = AnyRow> {
   rowCount?: number | null
 }
 
+/**
+ * Une section : un intertitre qui coiffe des lignes consécutives.
+ *
+ * Les frontières viennent de la SOURCE et non des lignes chargées : en
+ * défilement par blocs, une section chevauche souvent deux blocs, et son
+ * total calculé sur le seul bloc visible serait faux. La source répond donc
+ * pour l'ensemble du jeu filtré, en une requête par changement de tri ou de
+ * filtre.
+ */
+export interface SectionInfo {
+  /** Valeur brute de la colonne de regroupement (sert de clé). */
+  value: unknown
+  /** Intitulé affiché. À défaut, la valeur formatée. */
+  label?: string
+  /** Nombre de lignes de la section — c'est lui qui donne les frontières. */
+  count: number
+  /** Totaux par colonne, déjà agrégés par la source. */
+  totals?: Record<string, number>
+}
+
 export interface Datasource<TRow = AnyRow> {
   getRows(request: DataRequest): Promise<DataResponse<TRow>>
   /** Valeurs distinctes d'une colonne, pour les filtres `set`. */
   getSetValues?(columnId: string, request: Omit<DataRequest, 'startRow' | 'endRow'>): Promise<SetFilterOption[]>
+  /**
+   * Sections du jeu filtré, dans l'ordre d'affichage.
+   *
+   * Sans cette méthode, l'option `sections` reste sans effet : mieux vaut
+   * aucun intertitre qu'un intertitre au mauvais endroit.
+   */
+  getSections?(request: Omit<DataRequest, 'startRow' | 'endRow'>): Promise<SectionInfo[]>
 }
 
 /* ------------------------------------------------------------------------ */
@@ -289,7 +316,38 @@ export interface SidebarOptions {
   position?: 'start' | 'end'
 }
 
+/**
+ * Un filtre d'usage courant, offert en un clic dans la barre d'outils.
+ *
+ * Une grille d'administration a presque toujours trois ou quatre questions
+ * qu'on lui pose dix fois par jour — « ce qui reste à traiter », « ce mois »,
+ * « les sorties ». Les poser par le panneau de filtres demande quatre clics à
+ * chaque fois ; un tag en demande un, et se relit d'un coup d'œil puisqu'il
+ * reste allumé tant qu'il s'applique.
+ */
+export interface ToolbarTag {
+  /** Identifiant stable, pour retrouver le tag dans l'état. */
+  id: string
+  label: string
+  /** État de filtre posé par le tag, par colonne. */
+  filters: Record<string, ColumnFilterModel>
+  /** Teinte du tag une fois actif. Défaut : l'accent de la grille. */
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
+  /** Infobulle. */
+  title?: string
+}
+
 export interface ToolbarOptions {
+  /**
+   * Tags de filtres rapides, rendus à GAUCHE de la recherche.
+   *
+   * Un clic applique le filtre du tag, un second le retire. Deux tags qui
+   * portent sur des colonnes différentes se cumulent ; deux tags qui portent
+   * sur la même colonne se remplacent — sinon le second n'aurait aucun effet
+   * visible et le tableau paraîtrait bloqué.
+   */
+  tags?: ToolbarTag[]
+
   quickFilter?: boolean
   quickFilterPlaceholder?: string
   /**
@@ -493,6 +551,31 @@ export interface IsoGridOptions<TRow = AnyRow> {
    * chargé en réseau. Une colonne de chevron apparaît en tête.
    */
   masterDetail?: MasterDetailOptions<TRow>
+
+  /**
+   * Intertitres de section : une ligne plus haute, en gras, qui coiffe les
+   * lignes partageant une même valeur — « Décembre 2026 », par exemple — avec
+   * les totaux de la section à droite et un filet épais dessous.
+   *
+   * La colonne de regroupement est FIXE, déclarée ici : elle ne suit pas le
+   * tri courant. Trier par fournisseur ne réorganise donc pas les sections,
+   * il réorganise les lignes à l'intérieur — c'est ce qu'on veut d'un
+   * découpage par mois, qui doit rester le même quel que soit le tri.
+   *
+   * En mode source, les frontières et les totaux viennent de
+   * `Datasource.getSections()` : une section chevauche souvent deux blocs, et
+   * un total calculé sur les seules lignes chargées serait faux.
+   */
+  sections?: {
+    /** Identifiant de la colonne dont la valeur découpe les sections. */
+    column: string
+    /** Hauteur de l'intertitre. Défaut : 1,6 × la hauteur de ligne. */
+    height?: number
+    /** Colonnes à totaliser, affichées à droite de l'intitulé. */
+    totals?: string[]
+    /** Intitulé sur mesure ; à défaut, le libellé fourni par la source. */
+    label?: (section: SectionInfo) => string
+  }
 
   /**
    * Actions de ligne, regroupées derrière un bouton « ⋮ » dans une colonne
