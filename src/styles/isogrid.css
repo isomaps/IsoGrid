@@ -551,6 +551,12 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   order: 1;
 }
 .isg-sidebar.isg-open .isg-sidebar-body {
+  /* `flex: none` et pas seulement `width` : le panneau est un item flex, donc
+     rétrécissable par défaut. Quand le corps de la grille réclame toute la
+     largeur — le cas dès que la somme des colonnes dépasse l'écran, et
+     systématiquement en plein écran — le panneau se réduisait à ses seuls
+     10 px de marge : le clic sur « Filtres » semblait alors sans effet. */
+  flex: none;
   width: var(--isg-sidebar-width);
   padding: 10px;
 }
