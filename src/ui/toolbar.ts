@@ -1,4 +1,4 @@
-import type { ToolbarTag, ToolbarOptions } from '../core/types'
+import type { ColumnFilterModel, ToolbarTag, ToolbarOptions } from '../core/types'
 import type { GridContext } from './context'
 import { NS, debounce, el, onDismiss, positionFloating } from './dom'
 
@@ -211,8 +211,7 @@ export class Toolbar {
     const entrees = Object.entries(tag.filters)
     if (entrees.length === 0) return false
 
-    return entrees.every(([colonne, modele]) =>
-      JSON.stringify(etat[colonne] ?? null) === JSON.stringify(modele))
+    return entrees.every(([colonne, modele]) => memeFiltre(etat[colonne], modele))
   }
 
   private buildTag(tag: ToolbarTag): HTMLElement {
@@ -232,9 +231,48 @@ export class Toolbar {
           for (const [colonne, modele] of Object.entries(tag.filters)) {
             this.ctx.api.setFilter(colonne, etaitActif ? null : modele)
           }
-          this.render()
+          // Après le tour de boucle : `setFilter` passe par le modèle de
+          // colonnes, dont l'état n'est lisible qu'une fois la mise à jour
+          // propagée. Se redessiner tout de suite relisait l'ancien état, et
+          // le tag restait éteint alors que son filtre s'appliquait.
+          queueMicrotask(() => this.render())
         },
       },
     })
   }
+}
+
+/**
+ * Deux filtres décrivent-ils la même chose ?
+ *
+ * Comparaison champ par champ et non par `JSON.stringify` : l'état conservé
+ * par la grille est NORMALISÉ (clés complétées, ordre non garanti), donc il
+ * ne ressemble jamais littéralement au modèle écrit à la main dans un tag.
+ * Comparer les textes laissait le tag éteint alors que son filtre était bien
+ * appliqué.
+ */
+function memeFiltre(
+  a: ColumnFilterModel | undefined | null,
+  b: ColumnFilterModel | undefined | null,
+): boolean {
+  if (!a || !b || a.type !== b.type) return false
+
+  const ca = a.conditions ?? []
+  const cb = b.conditions ?? []
+  if (ca.length !== cb.length) return false
+
+  const memeValeur = (x: unknown, y: unknown): boolean => {
+    if (Array.isArray(x) && Array.isArray(y)) {
+      if (x.length !== y.length) return false
+      const tri = (v: unknown[]) => [...v].map(String).sort()
+      const [tx, ty] = [tri(x), tri(y)]
+      return tx.every((v, i) => v === ty[i])
+    }
+    return String(x ?? '') === String(y ?? '')
+  }
+
+  return ca.every((c, i) =>
+    c.op === cb[i].op
+    && memeValeur(c.value, cb[i].value)
+    && memeValeur(c.value2, cb[i].value2))
 }
