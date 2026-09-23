@@ -48,15 +48,15 @@
   --isg-cell-padding: 10px;
   --isg-sidebar-width: 260px;
 
-  /* Échelle d'empilement. Le plein écran doit passer au-dessus de
-     l'application hôte, donc très haut ; les surcouches de la grille
-     (popover de filtre, menu de colonne, message) doivent passer au-dessus
-     du plein écran, sinon elles s'ouvrent DERRIÈRE lui : en plein écran, un
-     clic sur un entonnoir ne montrait plus rien alors que le popover était
-     bien ouvert (vécu le 23/09/2026). */
+  /* Échelle d'empilement : plein écran 2147483000 < popover 2147483100 <
+     message 2147483200. Le plein écran passe au-dessus de l'application
+     hôte, et les surcouches au-dessus du plein écran — sinon elles s'ouvrent
+     DERRIÈRE lui, et un clic sur un entonnoir ne montre plus rien alors que
+     le popover est bien ouvert (vécu le 23/09/2026).
+     ⚠️ Popover et message sont TÉLÉPORTÉS dans le <body> : une variable
+     déclarée ici ne leur est pas héritée, leur z-index tomberait à `auto` et
+     ils passeraient derrière TOUT. D'où des valeurs littérales pour eux. */
   --isg-z-fullscreen: 2147483000;
-  --isg-z-popover: 2147483100;
-  --isg-z-toast: 2147483200;
 
   display: flex;
   flex-direction: column;
@@ -676,7 +676,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 
 .isg-popover {
   position: fixed;
-  z-index: var(--isg-z-popover);
+  z-index: 2147483100; /* littéral : élément téléporté hors de .isg-root */
   min-width: 210px;
   max-width: 320px;
   padding: 6px;
@@ -936,7 +936,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   position: fixed;
   left: 50%;
   bottom: 28px;
-  z-index: var(--isg-z-toast);
+  z-index: 2147483200; /* littéral : élément téléporté hors de .isg-root */
   display: flex;
   align-items: center;
   gap: 9px;
