@@ -38,8 +38,17 @@
      *
      * `filemtime` plutôt que le numéro de version : il change dès que le
      * fichier change, y compris entre deux builds d'une même version.
+     *
+     * ⚠️ Le JS **et** la CSS entrent dans le calcul. N'y mettre que le JS
+     * laissait un correctif de feuille de style invisible derrière le cache :
+     * l'URL de la CSS ne changeait pas, le navigateur gardait l'ancienne, et
+     * le bogue paraissait non corrigé — vécu le 23/09/2026 sur le panneau de
+     * filtres écrasé en plein écran.
      */
-    $isogridV = @filemtime(public_path('vendor/isogrid/isogrid.js')) ?: 'dev';
+    $isogridV = max(
+        (int) @filemtime(public_path('vendor/isogrid/isogrid.js')),
+        (int) @filemtime(public_path('vendor/isogrid/isogrid.css')),
+    ) ?: 'dev';
 @endphp
 
 @once
