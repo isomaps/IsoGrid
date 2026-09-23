@@ -72,7 +72,14 @@
         'excelJsUrl' => url('/vendor/isogrid/exceljs.js').'?v='.$isogridV,
     ], $options)))"
     x-init="mount()"
-    style="height: {{ $height }}"
+    {{-- `min-width: 0` n'est pas decoratif : le conteneur est souvent
+         l'enfant d'un flex (une page Filament, une carte), et un enfant flex
+         refuse par defaut de descendre sous la largeur de son contenu. La
+         grille, large de la somme de ses colonnes, poussait alors la page et
+         debordait a droite de l'ecran au lieu de defiler a l'interieur.
+         `width: 100%` et `max-width: 100%` ferment le meme piege dans une
+         grille CSS ou un bloc a largeur automatique. --}}
+    style="height: {{ $height }}; width: 100%; max-width: 100%; min-width: 0;"
     {{ $attributes }}
 ></div>
 {{-- Pas de `x-on:destroy` : Alpine appelle lui-même la méthode `destroy()`
