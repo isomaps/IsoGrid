@@ -164,6 +164,11 @@ Le **plein écran** y va aussi (`fs: 1`) : on partage une vue large justement
 pour qu'elle s'ouvre large, et retrouver son propre écran en grand après un
 rechargement évite un clic à chaque aller-retour.
 
+La recherche, à l'inverse, ne va **que** dans l'URL et jamais dans le
+stockage local : un terme de recherche répond à une question posée à
+l'instant. Retenu, il rouvre la page des jours plus tard en cachant 90 % des
+lignes sans que rien ne dise pourquoi — on croit à une perte de données.
+
 Ce qui n'y va pas : la visibilité et la largeur des colonnes. C'est un réglage
 personnel, et un lien doit transmettre la question posée aux données, pas la
 mise en page de celui qui l'envoie.

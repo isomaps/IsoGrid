@@ -300,9 +300,22 @@ function writeUrlState(param: string, state: Partial<GridState>, pleinEcran = fa
   }
 }
 
+/**
+ * Ce qui va dans le stockage local : tout l'état SAUF la recherche.
+ *
+ * Un terme de recherche est transitoire — il répond à une question posée à
+ * l'instant, pas à une préférence d'affichage. Retenu, il rouvre la page des
+ * jours plus tard en cachant 90 % des lignes, et rien à l'écran ne dit
+ * pourquoi : on croit à une perte de données. Vécu le 23/09/2026 sur le
+ * rapprochement bancaire, où « 164 lignes à rapprocher » en affichait 15.
+ *
+ * La recherche reste dans l'URL, où elle est explicite : elle s'y lit, s'y
+ * partage et s'efface en enlevant le paramètre.
+ */
 function writeState(key: string, state: GridState): void {
   try {
-    localStorage.setItem(key, JSON.stringify(state))
+    const { quickFilter: _recherche, ...persistable } = state
+    localStorage.setItem(key, JSON.stringify(persistable))
   } catch {
     /* silencieux : la persistance est un confort, pas une fonction critique */
   }
