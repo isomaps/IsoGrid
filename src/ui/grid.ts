@@ -919,19 +919,23 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       const existing = this.renderedRows.get(i)
       const display = this.displayRow(i)
 
+      // AVANT le `continue` ci-dessous : les intertitres arrivent après les
+      // lignes (une requête de plus), donc au moment où ils sont posés les
+      // lignes sont déjà rendues. Placé plus bas, ce bloc n'était jamais
+      // atteint et aucun bandeau n'apparaissait.
+      const section = this.sectionStarts.get(i)
+      if (section && !this.sectionNodes.has(i)) {
+        const bandeau = this.buildSectionHeader(i, section)
+        this.sectionNodes.set(i, bandeau)
+        this.bodyEl.append(bandeau)
+      }
+
       // Une ligne squelette est remplacée dès que sa donnée arrive.
       if (existing) {
         const wasSkeleton = existing.dataset.skeleton === '1'
         if (!wasSkeleton || !display) continue
         existing.remove()
         this.renderedRows.delete(i)
-      }
-
-      const section = this.sectionStarts.get(i)
-      if (section && !this.sectionNodes.has(i)) {
-        const bandeau = this.buildSectionHeader(i, section)
-        this.sectionNodes.set(i, bandeau)
-        this.bodyEl.append(bandeau)
       }
 
       const node = display?.kind === 'group'
