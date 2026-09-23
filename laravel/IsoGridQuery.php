@@ -396,7 +396,17 @@ final class IsoGridQuery
             ? $column->getValue(\Illuminate\Support\Facades\DB::connection()->getQueryGrammar())
             : $column;
 
-        return $withoutSelf->applyFilters(clone $query)
+        $base = $withoutSelf->applyFilters(clone $query);
+
+        // ⚠️ Repartir d'un SELECT VIDE. La requête d'origine sélectionne
+        // souvent ses colonnes calculées (`select t.*, (…) as total`), et un
+        // GROUP BY ajouté par-dessus fait échouer MySQL en mode
+        // ONLY_FULL_GROUP_BY : « 'id' isn't in GROUP BY ». Le filtre `set`
+        // renvoyait alors une liste vide, sans aucun message côté écran.
+        $sousJacente = $base instanceof EloquentBuilder ? $base->getQuery() : $base;
+        $sousJacente->columns = null;
+
+        return $base
             ->selectRaw($expression.' as value')
             ->selectRaw('count(*) as count')
             ->groupByRaw($expression)
