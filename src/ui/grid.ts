@@ -774,6 +774,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       else console.error('[IsoGrid] sections', error)
     }
     this.renderBody()
+    // Les lignes deja materialisees portent un decalage calcule SANS les
+    // intertitres — elles resteraient a leur place et le bandeau leur
+    // passerait dessus. `relayoutDetails` les repositionne toutes, panneaux
+    // et bandeaux compris, sans les reconstruire.
+    this.relayoutDetails()
   }
 
   /**
