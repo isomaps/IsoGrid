@@ -53,6 +53,8 @@ interface AlpineComponent {
   grid: IsoGrid | null
   config: IsoGridAlpineConfig
   surRechargement?: (ev: Event) => void
+  pleinEcran: boolean
+  dernierEtat: Partial<GridState>
   mount(): void
   destroy(): void
 }
@@ -67,14 +69,25 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
     grid: null as IsoGrid | null,
     config,
     surRechargement: undefined as ((ev: Event) => void) | undefined,
+    pleinEcran: false,
+    dernierEtat: {} as Partial<GridState>,
 
     mount(this: AlpineComponent) {
       const cfg = this.config
 
       // L'URL prime sur le stockage local : un lien partagé doit montrer ce
       // qu'il promet.
-      const restored = (cfg.urlParam ? readUrlState(cfg.urlParam) : undefined)
+      const { fs: fsUrl, ...etatUrl } = (cfg.urlParam ? readUrlState(cfg.urlParam) : undefined) ?? {}
+
+      // `Object.keys` et non un simple `??` : une URL qui ne porte QUE le
+      // plein écran laisserait sinon un état vide écraser les filtres retenus
+      // dans le stockage local — la grille s'ouvrirait en grand et remise à
+      // zéro, ce que le lien ne promettait pas.
+      const restored = (Object.keys(etatUrl).length > 0 ? etatUrl as Partial<GridState> : undefined)
         ?? (cfg.persistKey ? readState(cfg.persistKey) : undefined)
+
+      this.pleinEcran = fsUrl === 1
+      this.dernierEtat = restored ?? {}
 
       // `onStateChange` n'est pas enveloppé ici : il peut encore être un NOM
       // de fonction à ce stade. La persistance s'y greffe plus bas, une fois
@@ -156,9 +169,17 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
       // fonction.
       const suiteEtat = options.onStateChange
       options.onStateChange = (state) => {
+        this.dernierEtat = state
         if (cfg.persistKey) writeState(cfg.persistKey, state)
-        if (cfg.urlParam) writeUrlState(cfg.urlParam, state)
+        if (cfg.urlParam) writeUrlState(cfg.urlParam, state, this.pleinEcran)
         suiteEtat?.(state)
+      }
+
+      const suiteFs = options.onFullscreenChange
+      options.onFullscreenChange = (actif) => {
+        this.pleinEcran = actif
+        if (cfg.urlParam) writeUrlState(cfg.urlParam, this.dernierEtat, actif)
+        suiteFs?.(actif)
       }
 
       const ra = cfg.rowActions as (typeof cfg.rowActions & { items: unknown }) | undefined
@@ -179,6 +200,11 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
       }
 
       this.grid = new IsoGrid(this.$el, options)
+
+      // Après construction et non par une option : la bascule agit sur la
+      // racine déjà montée, et le `ResizeObserver` du viewport recalcule seul
+      // les lignes visibles.
+      if (this.pleinEcran) this.grid.toggleFullscreen()
 
       // Rechargement à la demande. Une grille vit sous `wire:ignore` — sinon
       // le prochain rendu Livewire effacerait le DOM qu'elle a construit —,
@@ -226,7 +252,7 @@ function readState(key: string): Partial<GridState> | undefined {
  * qui reste dans le stockage local. Un lien partagé doit transmettre la
  * QUESTION posée aux données, pas la mise en page de celui qui l'envoie.
  */
-function etatPartageable(state: GridState): Partial<GridState> {
+function etatPartageable(state: Partial<GridState>): Partial<GridState> {
   const partiel: Partial<GridState> = {}
   if (state.filters && Object.keys(state.filters).length > 0) partiel.filters = state.filters
   if (state.sort && state.sort.length > 0) partiel.sort = state.sort
@@ -234,11 +260,19 @@ function etatPartageable(state: GridState): Partial<GridState> {
   return partiel
 }
 
-function readUrlState(param: string): Partial<GridState> | undefined {
+/**
+ * Ce que l'URL transporte : l'état partageable de la grille, plus le plein
+ * écran — `fs: 1` — qui n'appartient pas à `GridState` mais mérite de suivre
+ * le lien : on partage souvent une vue large justement pour qu'elle s'ouvre
+ * large.
+ */
+type EtatUrl = Partial<GridState> & { fs?: 1 }
+
+function readUrlState(param: string): EtatUrl | undefined {
   try {
     const brut = new URLSearchParams(window.location.search).get(param)
     if (!brut) return undefined
-    const lu = JSON.parse(brut) as Partial<GridState>
+    const lu = JSON.parse(brut) as EtatUrl
     return lu && typeof lu === 'object' ? lu : undefined
   } catch {
     // URL bricolée à la main : on démarre sur l'état par défaut plutôt que de
@@ -247,9 +281,10 @@ function readUrlState(param: string): Partial<GridState> | undefined {
   }
 }
 
-function writeUrlState(param: string, state: GridState): void {
+function writeUrlState(param: string, state: Partial<GridState>, pleinEcran = false): void {
   try {
-    const partiel = etatPartageable(state)
+    const partiel: EtatUrl = etatPartageable(state)
+    if (pleinEcran) partiel.fs = 1
     const url = new URL(window.location.href)
     if (Object.keys(partiel).length === 0) {
       url.searchParams.delete(param)

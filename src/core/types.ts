@@ -335,6 +335,19 @@ export interface ToolbarTag {
   tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
   /** Infobulle. */
   title?: string
+  /**
+   * Pastille affichée à droite du libellé — un ordre de grandeur, calculé par
+   * l'hôte et fourni tel quel.
+   *
+   * La grille ne le calcule pas elle-même : en modèle serveur, elle ne connaît
+   * que le bloc de lignes qu'elle affiche, et un compteur déduit de ce bloc
+   * mentirait dès la deuxième page. L'hôte, lui, sait interroger l'ensemble du
+   * jeu (`select count(distinct …)`) et décider ce qui mérite d'être compté :
+   * des lignes, des fournisseurs, un montant.
+   */
+  badge?: string | number
+  /** Infobulle de la pastille — dire CE QUE le nombre compte. */
+  badgeTitle?: string
 }
 
 export interface ToolbarOptions {
@@ -610,6 +623,17 @@ export interface IsoGridOptions<TRow = AnyRow> {
 
   /** Appelé à chaque changement d'état : à persister côté hôte. */
   onStateChange?: (state: GridState) => void
+
+  /**
+   * Appelé à chaque bascule du plein écran (bouton, `Échap`, appel
+   * programmatique).
+   *
+   * Le plein écran ne fait pas partie de `GridState` : c'est une commodité
+   * d'affichage, pas une question posée aux données. Un hôte qui veut tout de
+   * même le retenir — dans l'URL, par exemple, pour qu'un lien rouvre la
+   * grille en grand — s'abonne ici.
+   */
+  onFullscreenChange?: (actif: boolean) => void
 
   onRowClick?: (row: TRow, index: number, event: MouseEvent) => void
   onRowDoubleClick?: (row: TRow, index: number, event: MouseEvent) => void

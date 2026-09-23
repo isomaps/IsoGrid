@@ -224,7 +224,16 @@ export class Toolbar {
         'aria-pressed': actif ? 'true' : 'false',
         ...(tag.title ? { title: tag.title } : {}),
       },
-      text: tag.label,
+      children: [
+        el('span', { text: tag.label }),
+        ...(tag.badge !== undefined && tag.badge !== null && tag.badge !== ''
+          ? [el('span', {
+              class: `${NS}-tag-badge`,
+              text: String(tag.badge),
+              attrs: tag.badgeTitle ? { title: tag.badgeTitle } : {},
+            })]
+          : []),
+      ],
       on: {
         click: () => {
           const etaitActif = this.tagEstActif(tag)

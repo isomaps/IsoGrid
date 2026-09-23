@@ -1690,6 +1690,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.isFs = !this.isFs
     this.root.classList.toggle(`${NS}-fullscreen`, this.isFs)
     this.toolbar?.syncFullscreenButton()
+    this.options.onFullscreenChange?.(this.isFs)
   }
 
   destroy(): void {

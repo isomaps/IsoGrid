@@ -160,6 +160,10 @@ Filtres, tri et recherche partent dans le paramètre nommé : la vue devient
 **partageable** et survit à un rechargement. Le `localStorage` garde l'état
 pour soi ; l'URL le transmet.
 
+Le **plein écran** y va aussi (`fs: 1`) : on partage une vue large justement
+pour qu'elle s'ouvre large, et retrouver son propre écran en grand après un
+rechargement évite un clic à chaque aller-retour.
+
 Ce qui n'y va pas : la visibilité et la largeur des colonnes. C'est un réglage
 personnel, et un lien doit transmettre la question posée aux données, pas la
 mise en page de celui qui l'envoie.
@@ -189,6 +193,22 @@ new IsoGrid(el, {
   },
 })
 ```
+
+Un tag porte une **pastille** facultative, `badge`, avec son infobulle
+`badgeTitle` :
+
+```ts
+{ id: 'a-traiter', label: 'À rapprocher', tone: 'danger',
+  badge: 25, badgeTitle: '25 contreparties pour 164 lignes',
+  filters: { /* … */ } }
+```
+
+La grille ne la calcule pas : en modèle serveur, elle ne connaît que le bloc
+de lignes affiché, et un compteur déduit de ce bloc mentirait dès la deuxième
+page. C'est l'hôte qui l'interroge — et qui décide de ce qui mérite d'être
+compté. Le nombre de lignes est déjà sous les yeux ; la pastille sert à
+l'information qui manque pour juger d'une pile : combien de contreparties,
+combien de dossiers, quel montant.
 
 Les tags se rendent **à gauche de la recherche**. Un clic applique, un second
 retire. Deux tags sur des colonnes différentes se cumulent ; deux tags sur la
