@@ -70,6 +70,13 @@ final class IsoGridQuery
      */
     private ?array $sections = null;
 
+    /**
+     * Totaux du pied, déclarés côté serveur.
+     *
+     * @var array<string, array{agg: string, par: string|null}>
+     */
+    private array $footer = [];
+
     private function __construct(private readonly array $payload) {}
 
     /**
@@ -124,6 +131,31 @@ final class IsoGridQuery
     public function maxPageSize(int $size): self
     {
         $this->maxPageSize = max(1, $size);
+
+        return $this;
+    }
+
+    /**
+     * Totaux du pied de grille, calculés sur TOUT le jeu filtré.
+     *
+     *     ->footer(['montant' => 'sum'])
+     *     ->footer(['montant' => ['sum', 'par' => 'devise']])  // un total par devise
+     *
+     * `par` regroupe le total selon une autre colonne : une colonne de montants
+     * qui mêle francs et euros ne s'additionne pas — le résultat serait un
+     * nombre qui n'existe pas.
+     *
+     * @param  array<string, string|array<int|string, string>>  $spec
+     */
+    public function footer(array $spec): self
+    {
+        foreach ($spec as $colonne => $regle) {
+            $agg = is_array($regle) ? (string) ($regle[0] ?? 'sum') : (string) $regle;
+            $par = is_array($regle) ? ($regle['par'] ?? null) : null;
+            if (in_array($agg, ['sum', 'avg', 'min', 'max', 'count'], true)) {
+                $this->footer[(string) $colonne] = ['agg' => $agg, 'par' => $par !== null ? (string) $par : null];
+            }
+        }
 
         return $this;
     }
@@ -436,6 +468,12 @@ final class IsoGridQuery
         $filtered = $this->applyFilters(clone $query);
         $rowCount = (clone $filtered)->count();
 
+        // Totaux avec le PREMIER bloc seulement : les blocs suivants, charges
+        // au defilement, portent sur le meme jeu filtre — les recalculer a
+        // chaque page ajouterait une requete d'agregat par bloc pour rien. Un
+        // bloc sans `footer` laisse la grille garder le dernier recu.
+        $footer = $this->footer !== [] && $this->startRow() === 0 ? $this->footerValues($filtered) : null;
+
         $rows = $this->applyPagination(
             $this->applySort($this->applySectionOrder($filtered))
         )->get();
@@ -443,7 +481,60 @@ final class IsoGridQuery
             $rows = $rows->map($transform);
         }
 
-        return ['rows' => $rows->values()->all(), 'rowCount' => $rowCount];
+        $reponse = ['rows' => $rows->values()->all(), 'rowCount' => $rowCount];
+        if ($footer !== null) {
+            $reponse['footer'] = $footer;
+        }
+
+        return $reponse;
+    }
+
+    /**
+     * Valeurs du pied, sur la requête déjà filtrée.
+     *
+     * @return array<string, float|array<string, float>|null>
+     */
+    private function footerValues(EloquentBuilder|QueryBuilder $filtered): array
+    {
+        $valeurs = [];
+
+        foreach ($this->footer as $id => $regle) {
+            $colonne = $this->resolve($id);
+            if ($colonne === null) {
+                continue;
+            }
+            $expr = $this->expressionSql($colonne);
+            $agg = $regle['agg'];
+
+            $base = clone $filtered;
+            // Même piège que les sections : repartir d'un SELECT vide, sans
+            // tri — sinon ONLY_FULL_GROUP_BY refuse le GROUP BY.
+            $sous = $base instanceof EloquentBuilder ? $base->getQuery() : $base;
+            $sous->columns = null;
+            $sous->orders = null;
+
+            $par = $regle['par'] !== null ? $this->resolve($regle['par']) : null;
+
+            if ($par === null) {
+                $v = $base->selectRaw("{$agg}({$expr}) as v")->value('v');
+                $valeurs[$id] = $v === null ? null : (float) $v;
+
+                continue;
+            }
+
+            $parSql = $this->expressionSql($par);
+            $valeurs[$id] = $base
+                ->selectRaw("{$parSql} as cle")
+                ->selectRaw("{$agg}({$expr}) as v")
+                ->groupByRaw($parSql)
+                ->orderByRaw($parSql)
+                ->get()
+                ->filter(fn ($r) => $r->cle !== null && $r->cle !== '')
+                ->mapWithKeys(fn ($r) => [(string) $r->cle => (float) $r->v])
+                ->all();
+        }
+
+        return $valeurs;
     }
 
     /**

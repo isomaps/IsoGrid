@@ -1226,9 +1226,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const surSelection = (opts.useSelection ?? true) && selection.length > 0
     const lignes = surSelection ? selection : this.getLoadedRows()
 
+    // Priorité : la fonction de l'hôte, puis les totaux renvoyés par la source
+    // (tout le jeu filtré), et seulement en dernier recours le calcul local.
+    // Sur une sélection, le calcul local est juste : les lignes sont chargées.
     const fournies = opts.values
       ? opts.values({ rows: lignes, onSelection: surSelection, rowCount: this.getDisplayedRowCount() })
-      : null
+      : (surSelection ? null : this.cache.getFooter())
 
     this.footerRenderer.render(columns, lignes, fournies, surSelection)
   }

@@ -129,11 +129,30 @@ export class FooterRenderer {
   private formate(def: ColumnDef, valeur: unknown, agg?: string): string {
     if (valeur === null || valeur === undefined || valeur === '') return ''
     if (def.footerFormatter) return def.footerFormatter(valeur, agg)
+
+    // Un total PAR DEVISE ({ CHF: …, EUR: … }) : chaque montant avec son
+    // unité, jamais additionnés entre eux.
+    if (typeof valeur === 'object' && !Array.isArray(valeur)) {
+      return Object.entries(valeur as Record<string, unknown>)
+        .filter(([, v]) => typeof v === 'number')
+        .map(([cle, v]) => `${cle} ${this.nombre(def, v as number)}`)
+        .join(' · ')
+    }
+    if (typeof valeur === 'number' && def.decimals != null) {
+      return this.nombre(def, valeur)
+    }
     if (typeof valeur === 'number') {
       /* Deux décimales au plus, et les séparateurs de la locale : un total
          sert à être lu, pas à être recopié. */
       return valeur.toLocaleString(undefined, { maximumFractionDigits: 2 })
     }
     return String(valeur)
+  }
+
+  private nombre(def: ColumnDef, v: number): string {
+    // Le traducteur de la grille, pas la locale du navigateur : le pied doit
+    // s'ecrire comme les cellules au-dessus (« 1 234,56 » en francais).
+    const d = def.decimals ?? 2
+    return this.t.number(v, { minimumFractionDigits: d, maximumFractionDigits: d })
   }
 }

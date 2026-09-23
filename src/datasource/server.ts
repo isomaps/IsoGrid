@@ -94,7 +94,8 @@ export function createHttpDatasource<TRow = AnyRow>(
       // Tolère les enveloppes Laravel les plus courantes.
       const rows = (body.rows ?? body.data ?? []) as TRow[]
       const rowCount = (body.rowCount ?? body.total ?? body.recordsFiltered ?? null) as number | null
-      return { rows, rowCount }
+      const footer = (body.footer ?? undefined) as Record<string, unknown> | undefined
+      return { rows, rowCount, footer }
     },
 
     async getSetValues(columnId, request): Promise<SetFilterOption[]> {
@@ -151,6 +152,8 @@ export interface BlockCacheOptions<TRow> {
 export class BlockCache<TRow = AnyRow> {
   private blocks = new Map<number, Block<TRow>>()
   private rowCount: number | null = null
+  /** Totaux du pied renvoyés par la source, pour le jeu filtré courant. */
+  private footer: Record<string, unknown> | null = null
   /** Incrémenté à chaque invalidation : toute réponse d'une génération périmée est jetée. */
   private generation = 0
   private clock = 0
@@ -164,6 +167,10 @@ export class BlockCache<TRow = AnyRow> {
 
   getRowCount(): number | null {
     return this.rowCount
+  }
+
+  getFooter(): Record<string, unknown> | null {
+    return this.footer
   }
 
   /**
@@ -248,6 +255,9 @@ export class BlockCache<TRow = AnyRow> {
         block.rows = response.rows ?? []
         block.controller = undefined
 
+        if (response.footer !== undefined) {
+          this.footer = response.footer ?? null
+        }
         if (response.rowCount != null) {
           this.rowCount = response.rowCount
         } else if (block.rows.length < blockSize) {
@@ -292,6 +302,7 @@ export class BlockCache<TRow = AnyRow> {
     for (const block of this.blocks.values()) block.controller?.abort()
     this.blocks.clear()
     this.rowCount = null
+    this.footer = null
   }
 
   /** Recharge sans perdre le total connu (rafraîchissement en place). */

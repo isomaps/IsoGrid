@@ -100,12 +100,29 @@ trait InteractsWithIsoGrid
         return null;
     }
 
+    /**
+     * Totaux du pied de grille, calculés par le serveur sur tout le jeu filtré.
+     *
+     *     return ['montant' => ['sum', 'par' => 'devise']];
+     *
+     * La colonne doit aussi porter un `aggFunc` côté grille, et la grille
+     * l'option `footer`. Sans cette déclaration, le pied additionnerait les
+     * seules lignes CHARGÉES — faux dès que le jeu dépasse un bloc.
+     *
+     * @return array<string, string|array<int|string, string>>
+     */
+    protected function isoGridFooter(): array
+    {
+        return [];
+    }
+
     private function isoGridResolver(array $payload): IsoGridQuery
     {
         $resolver = IsoGridQuery::fromArray($payload)
             ->allow($this->isoGridColumns())
             ->searchable($this->isoGridSearchable())
-            ->maxPageSize($this->isoGridMaxPageSize());
+            ->maxPageSize($this->isoGridMaxPageSize())
+            ->footer($this->isoGridFooter());
 
         // Le découpage s'applique AUSSI aux lignes : sans lui dans `respond()`,
         // les lignes d'un même mois ne se suivraient pas et les intertitres

@@ -286,6 +286,18 @@ export interface DataResponse<TRow = AnyRow> {
    * `null`/absent = inconnu : la grille passe en défilement infini.
    */
   rowCount?: number | null
+  /**
+   * Totaux du pied, calculés par la SOURCE sur tout le jeu filtré.
+   *
+   * En modèle serveur la grille ne voit qu'une fenêtre de lignes : un total
+   * calculé sur les lignes chargées serait faux dès que le jeu dépasse un bloc,
+   * sans que rien ne le signale. La source, elle, sait totaliser l'ensemble.
+   *
+   * Une valeur peut être un nombre, ou un objet `{ CHF: …, EUR: … }` quand la
+   * colonne mêle des devises : additionner des francs et des euros donnerait un
+   * nombre qui n'existe pas.
+   */
+  footer?: Record<string, unknown> | null
 }
 
 /**

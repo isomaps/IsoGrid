@@ -81,6 +81,7 @@ export function createLivewireDatasource<TRow = AnyRow>(
       return {
         rows: (raw?.rows ?? []) as TRow[],
         rowCount: (raw?.rowCount ?? null) as number | null,
+        footer: (raw?.footer ?? undefined) as Record<string, unknown> | undefined,
       }
     },
 
