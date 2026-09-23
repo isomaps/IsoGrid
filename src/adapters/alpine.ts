@@ -41,6 +41,7 @@ interface AlpineComponent {
   $wire?: WireProxy
   grid: IsoGrid | null
   config: IsoGridAlpineConfig
+  surRechargement?: (ev: Event) => void
   mount(): void
   destroy(): void
 }
@@ -54,6 +55,7 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
   return {
     grid: null as IsoGrid | null,
     config,
+    surRechargement: undefined as ((ev: Event) => void) | undefined,
 
     mount(this: AlpineComponent) {
       const cfg = this.config
@@ -162,9 +164,29 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
       }
 
       this.grid = new IsoGrid(this.$el, options)
+
+      // Rechargement à la demande. Une grille vit sous `wire:ignore` — sinon
+      // le prochain rendu Livewire effacerait le DOM qu'elle a construit —,
+      // et par conséquent aucun rafraîchissement du composant porteur ne la
+      // traverse : après avoir enregistré une modification dans un panneau
+      // latéral, la ligne restait affichée telle qu'avant. La page émet donc
+      // `isogrid:reload` et la grille recharge son bloc courant.
+      //
+      // `detail.key` permet de ne viser qu'une grille quand la page en porte
+      // plusieurs ; sans clé, toutes rechargent.
+      this.surRechargement = (ev: Event) => {
+        const cible = (ev as CustomEvent<{ key?: string }>).detail?.key
+        if (cible && cible !== cfg.persistKey) return
+        this.grid?.reload()
+      }
+      window.addEventListener('isogrid:reload', this.surRechargement)
     },
 
     destroy(this: AlpineComponent) {
+      if (this.surRechargement) {
+        window.removeEventListener('isogrid:reload', this.surRechargement)
+        this.surRechargement = undefined
+      }
       this.grid?.destroy()
       this.grid = null
     },

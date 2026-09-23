@@ -563,6 +563,25 @@ Envoyer aussi les filtres n'est pas superflu : en mode `exclude`, la sélection
 dit « tout sauf ces trois-là », et « tout » n'a de sens que rapporté au jeu
 filtré du moment.
 
+#### Recharger la grille après une modification
+
+La grille vit sous `wire:ignore` — sans quoi le prochain rendu Livewire
+effacerait le DOM qu'elle a construit. Par conséquent **aucun
+rafraîchissement du composant porteur ne la traverse** : après avoir
+enregistré une modification dans un panneau latéral ou une modale, la ligne
+reste affichée telle qu'avant.
+
+La page émet donc un événement, et la grille recharge son bloc courant :
+
+```js
+window.dispatchEvent(new CustomEvent('isogrid:reload'))
+// ou, pour ne viser qu'une grille quand la page en porte plusieurs :
+window.dispatchEvent(new CustomEvent('isogrid:reload', { detail: { key: 'admin.factures.v2' } }))
+```
+
+Depuis un composant Livewire, `$this->dispatch('invoice-updated')` puis un
+écouteur JS d'une ligne suffit.
+
 ### 3. Livewire / Filament
 
 Le plus intégré : la grille appelle les méthodes du composant Livewire qui la
