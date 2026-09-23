@@ -1060,8 +1060,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private formatAggregate(def: ColumnDef<TRow>, value: unknown): string {
     if (typeof value === 'number' && def.type === 'number') {
       // Les moyennes tombent rarement juste : deux décimales suffisent, mais
-      // on n'en impose pas à une somme d'entiers.
-      const decimals = Number.isInteger(value) ? 0 : 2
+      // on n'en impose pas à une somme d'entiers — sauf si la colonne a fixé
+      // son propre nombre de décimales, auquel cas le total doit s'aligner
+      // sur ses cellules.
+      const decimals = def.decimals ?? (Number.isInteger(value) ? 0 : 2)
       return this.t.number(value, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     }
     return String(value ?? '')
@@ -1150,7 +1152,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     if (def.type === 'number') {
       const n = typeof value === 'number' ? value : Number(String(value).replace(',', '.'))
-      return Number.isNaN(n) ? String(value) : this.t.number(n)
+      if (Number.isNaN(n)) return String(value)
+      return def.decimals === undefined
+        ? this.t.number(n)
+        : this.t.number(n, { minimumFractionDigits: def.decimals, maximumFractionDigits: def.decimals })
     }
     if (def.type === 'date' || def.type === 'datetime') {
       const d = value instanceof Date ? value : new Date(String(value))

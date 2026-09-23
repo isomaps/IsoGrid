@@ -56,6 +56,15 @@ export interface ColumnDef<TRow = AnyRow> {
 
   type?: ColumnType
 
+  /**
+   * Nombre de décimales imposé pour une colonne `number`.
+   *
+   * Sans lui, `Intl` décide : un entier sort sans décimale et une somme
+   * d'argent se lit « 1 712 » à côté de « 104,32 », ce qui rend une colonne
+   * de montants illisible en diagonale. `decimals: 2` aligne tout.
+   */
+  decimals?: number
+
   width?: number
   minWidth?: number
   maxWidth?: number
