@@ -20,6 +20,17 @@ import type { AnyRow, GridState, IsoGridOptions } from '../core/types'
 
 export interface IsoGridAlpineConfig extends Omit<IsoGridOptions<AnyRow>, 'datasource'> {
   /**
+   * Nom du paramètre d'URL où refléter l'état (filtres, tri, recherche).
+   *
+   * Une vue filtrée devient alors partageable et survit à un rechargement —
+   * ce que le seul `localStorage` ne permet pas : il garde l'état pour SOI,
+   * pas pour le lien qu'on envoie à quelqu'un.
+   *
+   * L'URL a priorité sur le stockage local : un lien reçu doit montrer ce
+   * qu'il promet, même si l'on a laissé d'autres filtres en place la veille.
+   */
+  urlParam?: string
+  /**
    * - `'livewire'` : appelle les méthodes du composant Livewire porteur
    * - une chaîne : URL d'un point d'entrée HTTP
    * - omis : mode client, avec `rows`
@@ -60,7 +71,10 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
     mount(this: AlpineComponent) {
       const cfg = this.config
 
-      const restored = cfg.persistKey ? readState(cfg.persistKey) : undefined
+      // L'URL prime sur le stockage local : un lien partagé doit montrer ce
+      // qu'il promet.
+      const restored = (cfg.urlParam ? readUrlState(cfg.urlParam) : undefined)
+        ?? (cfg.persistKey ? readState(cfg.persistKey) : undefined)
 
       // `onStateChange` n'est pas enveloppé ici : il peut encore être un NOM
       // de fonction à ce stade. La persistance s'y greffe plus bas, une fois
@@ -143,6 +157,7 @@ export function isoGridAlpineComponent(config: IsoGridAlpineConfig) {
       const suiteEtat = options.onStateChange
       options.onStateChange = (state) => {
         if (cfg.persistKey) writeState(cfg.persistKey, state)
+        if (cfg.urlParam) writeUrlState(cfg.urlParam, state)
         suiteEtat?.(state)
       }
 
@@ -201,6 +216,52 @@ function readState(key: string): Partial<GridState> | undefined {
     // Stockage indisponible (mode privé, quota) : on démarre sur l'état par
     // défaut plutôt que d'empêcher la grille de s'afficher.
     return undefined
+  }
+}
+
+/**
+ * Ce qui va dans l'URL : filtres, tri, recherche.
+ *
+ * Pas la visibilité ni la largeur des colonnes — c'est un réglage personnel,
+ * qui reste dans le stockage local. Un lien partagé doit transmettre la
+ * QUESTION posée aux données, pas la mise en page de celui qui l'envoie.
+ */
+function etatPartageable(state: GridState): Partial<GridState> {
+  const partiel: Partial<GridState> = {}
+  if (state.filters && Object.keys(state.filters).length > 0) partiel.filters = state.filters
+  if (state.sort && state.sort.length > 0) partiel.sort = state.sort
+  if (state.quickFilter) partiel.quickFilter = state.quickFilter
+  return partiel
+}
+
+function readUrlState(param: string): Partial<GridState> | undefined {
+  try {
+    const brut = new URLSearchParams(window.location.search).get(param)
+    if (!brut) return undefined
+    const lu = JSON.parse(brut) as Partial<GridState>
+    return lu && typeof lu === 'object' ? lu : undefined
+  } catch {
+    // URL bricolée à la main : on démarre sur l'état par défaut plutôt que de
+    // refuser d'afficher la grille.
+    return undefined
+  }
+}
+
+function writeUrlState(param: string, state: GridState): void {
+  try {
+    const partiel = etatPartageable(state)
+    const url = new URL(window.location.href)
+    if (Object.keys(partiel).length === 0) {
+      url.searchParams.delete(param)
+    } else {
+      url.searchParams.set(param, JSON.stringify(partiel))
+    }
+    // `replaceState` et non `pushState` : chaque frappe dans la recherche
+    // ajouterait sinon une entrée d'historique, et le bouton « retour »
+    // deviendrait inutilisable.
+    window.history.replaceState(window.history.state, '', url)
+  } catch {
+    /* silencieux : le reflet dans l'URL est un confort */
   }
 }
 
