@@ -560,14 +560,21 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
   transition: width .16s ease;
   order: 1;
 }
+/* La largeur est portée par le PANNEAU lui-même, et pas seulement par son
+   corps. Sans elle, sa base flex valait `auto`, donc la largeur de son
+   contenu — et quand le corps de la grille réclamait toute la place (dès que
+   la somme des colonnes dépasse l'écran, systématiquement en plein écran) le
+   panneau tombait à ses 10 px de marge : le clic sur « Filtres » semblait
+   sans effet alors que le panneau était bien ouvert. Le `min-width` du corps
+   ferme le même piège à l'intérieur. */
+.isg-sidebar.isg-open {
+  flex: 0 0 auto;
+  width: calc(var(--isg-sidebar-width) + 20px);
+}
 .isg-sidebar.isg-open .isg-sidebar-body {
-  /* `flex: none` et pas seulement `width` : le panneau est un item flex, donc
-     rétrécissable par défaut. Quand le corps de la grille réclame toute la
-     largeur — le cas dès que la somme des colonnes dépasse l'écran, et
-     systématiquement en plein écran — le panneau se réduisait à ses seuls
-     10 px de marge : le clic sur « Filtres » semblait alors sans effet. */
   flex: none;
   width: var(--isg-sidebar-width);
+  min-width: var(--isg-sidebar-width);
   padding: 10px;
 }
 @media (prefers-reduced-motion: reduce) {
