@@ -402,6 +402,69 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 
 .isg-body { position: relative; }
 
+/* ==========================================================================
+   Intertitres de section
+   ========================================================================== */
+
+/* Le bandeau couvre toute la largeur de defilement (comme une ligne), mais
+   son contenu est cale sur la fenetre : voir `.isg-section-inner`. */
+.isg-section {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: var(--isg-bg);
+  /* Le filet epais est ce qui fait lire le decoupage d'un coup d'oeil ; sans
+     lui, l'intertitre passe pour une ligne un peu grasse. */
+  border-bottom: 2px solid var(--isg-fg-muted);
+  z-index: 3;
+  will-change: transform;
+}
+
+/* `sticky` a gauche : un intitule qui sort de l'ecran des qu'on fait defiler
+   horizontalement ne sert a rien — c'est justement en parcourant les colonnes
+   de droite qu'on a besoin de savoir dans quel mois on se trouve. La largeur
+   est celle de la fenetre, pas celle du defilement, pour que les totaux se
+   posent contre le bord droit visible. */
+.isg-section-inner {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 var(--isg-cell-padding) 4px;
+  box-sizing: border-box;
+}
+
+.isg-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--isg-fg);
+  white-space: nowrap;
+}
+.isg-section-count { font-weight: 400; font-size: 11px; color: var(--isg-fg-muted); }
+
+.isg-section-totals {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  white-space: nowrap;
+}
+.isg-section-total { display: inline-flex; align-items: baseline; gap: 6px; }
+.isg-section-total-label { font-size: 11px; color: var(--isg-fg-muted); }
+.isg-section-total-value {
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--isg-fg);
+}
+
 .isg-row {
   position: absolute;
   top: 0;

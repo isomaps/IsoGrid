@@ -1,5 +1,5 @@
 import type {
-  AnyRow, DataRequest, DataResponse, Datasource, SetFilterOption,
+  AnyRow, DataRequest, DataResponse, Datasource, SectionInfo, SetFilterOption,
 } from '../core/types'
 
 /**
@@ -31,6 +31,8 @@ export interface LivewireDatasourceOptions {
   rowsMethod?: string
   /** Méthode PHP servant les valeurs distinctes. Défaut : `isoGridSetValues`. */
   setValuesMethod?: string
+  /** Méthode PHP servant les frontières de sections. Défaut : `isoGridSections`. */
+  sectionsMethod?: string
 }
 
 /** Retire `signal` : un AbortSignal n'est pas sérialisable vers PHP. */
@@ -58,6 +60,7 @@ export function createLivewireDatasource<TRow = AnyRow>(
 
   const rowsMethod = options.rowsMethod ?? 'isoGridRows'
   const setValuesMethod = options.setValuesMethod ?? 'isoGridSetValues'
+  const sectionsMethod = options.sectionsMethod ?? 'isoGridSections'
 
   /**
    * Livewire sérialise les appels d'un même composant et n'expose aucun
@@ -94,6 +97,16 @@ export function createLivewireDatasource<TRow = AnyRow>(
           ? (v as SetFilterOption)
           : { value: v as SetFilterOption['value'] }
       ))
+    },
+
+    async getSections(request): Promise<SectionInfo[]> {
+      const raw = await callAbortable(sectionsMethod, {
+        filters: request.filters,
+        quickFilter: request.quickFilter,
+      }, request.signal) as unknown
+
+      const sections = (raw as Record<string, unknown>)?.sections ?? raw
+      return ((sections ?? []) as SectionInfo[])
     },
   }
 }

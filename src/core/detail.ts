@@ -66,8 +66,16 @@ export interface MasterDetailOptions<TRow = AnyRow> {
  * de panneaux ouverts.
  */
 export class DetailLayout {
-  /** Panneaux ouverts : index de la ligne maître et hauteur AJOUTÉE, triés. */
-  private entries: Array<{ index: number; height: number }> = []
+  /**
+   * Hauteurs exceptionnelles, triées par index.
+   *
+   * `position: 'after'` = un panneau de détail, qui se place SOUS sa ligne
+   * maître et ne la décale donc pas. `position: 'before'` = un intertitre de
+   * section, qui se place AU-DESSUS de sa ligne et la décale, elle comprise.
+   * Les deux cohabitent : une même ligne peut ouvrir une section et porter un
+   * panneau.
+   */
+  private entries: Array<{ index: number; height: number; position: 'before' | 'after' }> = []
 
   constructor(private rowHeight: number) {}
 
@@ -81,19 +89,37 @@ export class DetailLayout {
 
   /** Déclare un panneau à un index d'affichage donné. */
   set(index: number, height: number): void {
-    const found = this.entries.find(e => e.index === index)
+    const found = this.entries.find(e => e.index === index && e.position === 'after')
     if (found) { found.height = height; return }
-    this.entries.push({ index, height })
-    this.entries.sort((a, b) => a.index - b.index)
+    this.entries.push({ index, height, position: 'after' })
+    this.entries.sort((a, b) => a.index - b.index || (a.position === 'before' ? -1 : 1))
+  }
+
+  /** Déclare un intertitre AU-DESSUS de la ligne d'index donné. */
+  setBefore(index: number, height: number): void {
+    const found = this.entries.find(e => e.index === index && e.position === 'before')
+    if (found) { found.height = height; return }
+    this.entries.push({ index, height, position: 'before' })
+    this.entries.sort((a, b) => a.index - b.index || (a.position === 'before' ? -1 : 1))
+  }
+
+  /** Oublie tous les intertitres, sans toucher aux panneaux ouverts. */
+  clearBefore(): void {
+    this.entries = this.entries.filter(e => e.position !== 'before')
   }
 
   has(index: number): boolean {
-    return this.entries.some(e => e.index === index)
+    return this.entries.some(e => e.index === index && e.position === 'after')
   }
 
   /** Hauteur du panneau attaché à cette ligne, 0 s'il n'y en a pas. */
   getPanelHeight(index: number): number {
-    return this.entries.find(e => e.index === index)?.height ?? 0
+    return this.entries.find(e => e.index === index && e.position === 'after')?.height ?? 0
+  }
+
+  /** Hauteur de l'intertitre posé au-dessus de cette ligne, 0 sinon. */
+  getHeaderHeight(index: number): number {
+    return this.entries.find(e => e.index === index && e.position === 'before')?.height ?? 0
   }
 
   /**
@@ -105,7 +131,9 @@ export class DetailLayout {
   private surplusBefore(index: number): number {
     let sum = 0
     for (const e of this.entries) {
-      if (e.index >= index) break
+      if (e.index > index) break
+      // Un panneau de la ligne elle-même ne la décale pas ; son intertitre, si.
+      if (e.index === index && e.position === 'after') continue
       sum += e.height
     }
     return sum
@@ -127,19 +155,33 @@ export class DetailLayout {
       return Math.max(0, Math.min(rowCount, Math.floor(scrollTop / this.rowHeight)))
     }
 
-    // Peu de panneaux ouverts : on avance de l'un à l'autre, et dès que le
-    // décalage cible tombe dans une zone régulière on conclut par division.
+    // On avance d'exception en exception ; dès que le point cherché tombe
+    // dans une zone de lignes régulières, une division conclut.
     let offset = 0
     let index = 0
     for (const e of this.entries) {
-      // Zone de lignes régulières jusqu'à la ligne maître incluse.
+      if (e.position === 'before') {
+        // Lignes régulières AVANT la ligne coiffée par l'intertitre.
+        const regular = (e.index - index) * this.rowHeight
+        if (scrollTop < offset + regular) {
+          return index + Math.floor((scrollTop - offset) / this.rowHeight)
+        }
+        offset += regular
+        index = e.index
+        // Un point dans l'intertitre désigne la première ligne de sa section.
+        if (scrollTop < offset + e.height) return e.index
+        offset += e.height
+        continue
+      }
+
+      // Panneau : zone régulière jusqu'à la ligne maître INCLUSE.
       const regular = (e.index - index + 1) * this.rowHeight
       if (scrollTop < offset + regular) {
         return index + Math.floor((scrollTop - offset) / this.rowHeight)
       }
       offset += regular
       index = e.index + 1
-      // Le panneau : tout point qui y tombe désigne encore sa ligne maître.
+      // Tout point qui tombe dans le panneau désigne encore sa ligne maître.
       if (scrollTop < offset + e.height) return e.index
       offset += e.height
     }

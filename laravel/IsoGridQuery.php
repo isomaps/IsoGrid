@@ -63,6 +63,13 @@ final class IsoGridQuery
     /** Plafond de lignes servies en une requête, garde-fou contre un `endRow` délirant. */
     private int $maxPageSize = 5000;
 
+    /**
+     * Découpage en sections, déclaré côté serveur.
+     *
+     * @var null|array{column: string, direction: string, totals: array<int, string>, label: string|null}
+     */
+    private ?array $sections = null;
+
     private function __construct(private readonly array $payload) {}
 
     /**
@@ -121,6 +128,37 @@ final class IsoGridQuery
         return $this;
     }
 
+    /**
+     * Découpe le résultat en sections sur une colonne donnée.
+     *
+     * L'identifiant vient du CODE et non de la requête : un découpage est une
+     * décision de page, pas une option que le navigateur négocie. Il doit
+     * malgré tout figurer dans `allow()`, comme toute colonne touchee par du SQL.
+     *
+     * @param  array<int, string>  $totals  identifiants de colonnes à sommer
+     * @param  string|null  $labelColumn  colonne portant l'intitulé lisible
+     */
+    public function sections(
+        string $columnId,
+        string $direction = 'desc',
+        array $totals = [],
+        ?string $labelColumn = null,
+    ): self {
+        $this->sections = [
+            'column' => $columnId,
+            'direction' => strtolower($direction) === 'asc' ? 'asc' : 'desc',
+            'totals' => array_values($totals),
+            // L'intitulé vient du SERVEUR et non du navigateur : « Décembre
+            // 2026 » dépend de la langue, et MySQL ne nomme les mois en
+            // français que si `lc_time_names` est réglé — ce qu'on ne peut pas
+            // supposer. Le libellé est donc une colonne comme une autre, que
+            // la page compose comme elle l'entend.
+            'label' => $labelColumn,
+        ];
+
+        return $this;
+    }
+
     /* ------------------------------------------------------------------ */
     /* Lecture de la requête                                               */
     /* ------------------------------------------------------------------ */
@@ -144,6 +182,14 @@ final class IsoGridQuery
     private function resolve(string $columnId): string|Expression|null
     {
         return $this->allowed[$columnId] ?? null;
+    }
+
+    /** Rend une colonne autorisée sous forme de SQL utilisable en GROUP BY. */
+    private function expressionSql(string|Expression $column): string
+    {
+        return $column instanceof Expression
+            ? $column->getValue(\Illuminate\Support\Facades\DB::connection()->getQueryGrammar())
+            : $column;
     }
 
     /* ------------------------------------------------------------------ */
@@ -236,6 +282,34 @@ final class IsoGridQuery
     public function applyPagination(EloquentBuilder|QueryBuilder $query): EloquentBuilder|QueryBuilder
     {
         return $query->offset($this->startRow())->limit($this->limit());
+    }
+
+    /**
+     * Ordonne par la colonne de section AVANT le tri demandé.
+     *
+     * Sans cela, les sections seraient fausses dès le premier tri : la grille
+     * pose les intertitres sur des effectifs consécutifs (« les 34 premières
+     * lignes sont de décembre »), ce qui n'a de sens que si les lignes du même
+     * mois se suivent. Le tri de l'utilisateur garde tout son effet — il
+     * réordonne À L'INTÉRIEUR de chaque section.
+     *
+     * @template T of EloquentBuilder|QueryBuilder
+     * @param  T  $query
+     * @return T
+     */
+    public function applySectionOrder(EloquentBuilder|QueryBuilder $query): EloquentBuilder|QueryBuilder
+    {
+        if ($this->sections === null) {
+            return $query;
+        }
+        $column = $this->resolve($this->sections['column']);
+        if ($column === null) {
+            throw new InvalidArgumentException(
+                "IsoGrid: colonne de section « {$this->sections['column']} » non autorisée"
+            );
+        }
+
+        return $query->orderBy($column, $this->sections['direction']);
     }
 
     private function applyCondition(
@@ -362,12 +436,95 @@ final class IsoGridQuery
         $filtered = $this->applyFilters(clone $query);
         $rowCount = (clone $filtered)->count();
 
-        $rows = $this->applyPagination($this->applySort($filtered))->get();
+        $rows = $this->applyPagination(
+            $this->applySort($this->applySectionOrder($filtered))
+        )->get();
         if ($transform !== null) {
             $rows = $rows->map($transform);
         }
 
         return ['rows' => $rows->values()->all(), 'rowCount' => $rowCount];
+    }
+
+    /**
+     * Effectifs et totaux par section, sur le jeu FILTRÉ ENTIER.
+     *
+     * C'est la seule façon d'avoir des intertitres justes en défilement par
+     * blocs : une section chevauche souvent deux blocs, et un total calculé
+     * sur les seules lignes chargées serait faux sans que rien ne le dise.
+     *
+     * @return array<int, array{value: mixed, count: int, totals: array<string, float>}>
+     */
+    public function sectionCounts(EloquentBuilder|QueryBuilder $query): array
+    {
+        if ($this->sections === null) {
+            return [];
+        }
+        $column = $this->resolve($this->sections['column']);
+        if ($column === null) {
+            throw new InvalidArgumentException(
+                "IsoGrid: colonne de section « {$this->sections['column']} » non autorisée"
+            );
+        }
+        $expression = $this->expressionSql($column);
+
+        $base = $this->applyFilters(clone $query);
+
+        // ⚠️ Même piège que `setValues()` : la requête d'origine sélectionne
+        // ses colonnes calculées, et un GROUP BY par-dessus fait échouer MySQL
+        // en ONLY_FULL_GROUP_BY — sections vides, sans message à l'écran.
+        $sousJacente = $base instanceof EloquentBuilder ? $base->getQuery() : $base;
+        $sousJacente->columns = null;
+        $sousJacente->orders = null;
+
+        $base->selectRaw($expression.' as section_value')->selectRaw('count(*) as section_count');
+
+        $libelle = $this->sections['label'] !== null ? $this->resolve($this->sections['label']) : null;
+        if ($libelle !== null) {
+            $base->selectRaw($this->expressionSql($libelle).' as section_label');
+        }
+
+        $totaux = [];
+        foreach ($this->sections['totals'] as $id) {
+            $colonne = $this->resolve($id);
+            if ($colonne === null) {
+                continue;
+            }
+            // L'alias est indexé et non construit sur l'identifiant : un nom
+            // de colonne exposé peut contenir de quoi casser l'alias.
+            $alias = 'section_total_'.count($totaux);
+            $totaux[$alias] = $id;
+            $base->selectRaw('sum('.$this->expressionSql($colonne).') as '.$alias);
+        }
+
+        if ($libelle !== null) {
+            // Le libellé entre dans le GROUP BY : en ONLY_FULL_GROUP_BY, une
+            // colonne sélectionnée mais non groupée fait échouer la requête.
+            $base->groupByRaw($this->expressionSql($libelle));
+        }
+
+        return $base
+            ->groupByRaw($expression)
+            ->orderByRaw($expression.' '.$this->sections['direction'])
+            ->get()
+            ->map(function ($row) use ($totaux): array {
+                $sommes = [];
+                foreach ($totaux as $alias => $id) {
+                    $sommes[$id] = (float) ($row->{$alias} ?? 0);
+                }
+
+                $section = [
+                    'value' => $row->section_value,
+                    'count' => (int) $row->section_count,
+                    'totals' => $sommes,
+                ];
+                if (isset($row->section_label)) {
+                    $section['label'] = (string) $row->section_label;
+                }
+
+                return $section;
+            })
+            ->all();
     }
 
     /**
@@ -392,9 +549,7 @@ final class IsoGridQuery
         $withoutSelf->allowed = $this->allowed;
         $withoutSelf->searchable = $this->searchable;
 
-        $expression = $column instanceof Expression
-            ? $column->getValue(\Illuminate\Support\Facades\DB::connection()->getQueryGrammar())
-            : $column;
+        $expression = $this->expressionSql($column);
 
         $base = $withoutSelf->applyFilters(clone $query);
 

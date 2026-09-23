@@ -1,7 +1,7 @@
 import type {
   AnyRow, CellContext, ColumnDef, Datasource, ExportOptions, ExportProgress,
   GridState, IconName, IsoGridApi, IsoGridOptions, LocaleCode, PinPosition,
-  SetFilterOption, SortModel, ThemeMode,
+  SectionInfo, SetFilterOption, SortModel, ThemeMode,
 } from '../core/types'
 import { ColumnModel, type RenderColumn } from '../core/table'
 import {
@@ -74,6 +74,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private resizeObserver?: ResizeObserver
   /** Plein écran (bascule CSS, cf. `toggleFullscreen`) — jamais persisté dans `GridState`. */
   private isFs = false
+
+  /* --- sections (intertitres) --- */
+  /** Frontieres et totaux fournis par la source, pour tout le jeu filtre. */
+  private sections: SectionInfo[] = []
+  /** Index de premiere ligne de chaque section => la section. */
+  private sectionStarts = new Map<number, SectionInfo>()
+  /** Bandeaux materialises, recycles comme les lignes. */
+  private sectionNodes = new Map<number, HTMLElement>()
+  /** Signature des filtres pour lesquels `sections` a ete obtenu. */
+  private sectionsSignature: string | null = null
 
   constructor(container: HTMLElement, options: IsoGridOptions<TRow>) {
     this.options = options
@@ -156,6 +166,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // est actif : `toggleFullscreen()` reste appelable par programme même sans
     // `toolbar.fullscreenButton`, et Échap doit alors marcher aussi.
     document.addEventListener('keydown', this.onKeyDown)
+
+    if (this.options.sections) void this.fetchSections()
   }
 
   /** Largeur utile pour les colonnes — même marge que `sizeColumnsToFit()`. */
@@ -274,6 +286,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    */
   private syncDetailLayout(): void {
     this.detailLayout.reset()
+    this.applySectionLayout()
     if (!this.options.masterDetail) return
     if (this.details.getOpen().length === 0) return
 
@@ -373,6 +386,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     }
     for (const [index, panel] of this.detailNodes) {
       panel.style.transform = `translateY(${this.detailLayout.offsetOf(index) + rowHeight}px)`
+    }
+    const hauteurSection = this.sectionHeight()
+    for (const [index, bandeau] of this.sectionNodes) {
+      bandeau.style.transform = `translateY(${this.detailLayout.offsetOf(index) - hauteurSection}px)`
     }
   }
 
@@ -626,6 +643,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.headerRenderer.render()
     this.syncWidths()
     this.renderedRows.clear()
+    this.sectionNodes.clear()
     this.bodyEl.replaceChildren()
     this.renderBody()
     this.groupPanel?.render()
@@ -715,6 +733,137 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.renderBody()
   }
 
+  /* -------------------------------------------------------------------- */
+  /* Sections                                                              */
+  /* -------------------------------------------------------------------- */
+
+  /**
+   * Demande les frontieres de sections a la source.
+   *
+   * Les frontieres viennent de la source et non des lignes chargees : une
+   * section chevauche souvent deux blocs, et son total calcule sur le seul
+   * bloc visible serait faux. Une requete par changement de filtre suffit —
+   * le tri ne deplace pas les frontieres, puisque la colonne de decoupage est
+   * fixe et que la source ordonne par elle en premier.
+   */
+  private async fetchSections(): Promise<void> {
+    if (!this.options.sections) return
+    const source = this.resolveDatasource()
+    if (!source.getSections) return
+
+    const signature = this.filterSignature()
+    if (this.sectionsSignature === signature && this.sections.length > 0) return
+
+    const context = this.buildRequestContext()
+    try {
+      const sections = await source.getSections({
+        sort: context.sort,
+        filters: context.filters,
+        quickFilter: context.quickFilter,
+        columns: context.columns,
+      })
+      if (this.destroyed) return
+      this.sectionsSignature = signature
+      this.sections = Array.isArray(sections) ? sections : []
+    } catch (error) {
+      // Mieux vaut aucun intertitre qu'un intertitre au mauvais endroit : on
+      // n'invente pas de frontieres, et la grille reste utilisable.
+      this.sections = []
+      this.sectionsSignature = null
+      if (this.options.onError) this.options.onError(error)
+      else console.error('[IsoGrid] sections', error)
+    }
+    this.renderBody()
+  }
+
+  /**
+   * Traduit les effectifs de sections en frontieres d'index, et reserve la
+   * hauteur des bandeaux dans la couche de decalages.
+   */
+  private applySectionLayout(): void {
+    this.sectionStarts.clear()
+    const cfg = this.options.sections
+    if (!cfg || this.sections.length === 0) return
+    // Groupage et sections decoupent tous deux le corps : les cumuler
+    // donnerait deux hierarchies concurrentes, illisibles.
+    if (this.grouping.isActive()) return
+
+    const height = cfg.height ?? Math.round(this.rowHeight() * 1.6)
+    const total = this.totalRowCount()
+    let index = 0
+    for (const section of this.sections) {
+      if (index >= total) break
+      this.sectionStarts.set(index, section)
+      this.detailLayout.setBefore(index, height)
+      index += Math.max(0, Math.round(section.count))
+    }
+  }
+
+  private sectionHeight(): number {
+    const cfg = this.options.sections
+    return cfg?.height ?? Math.round(this.rowHeight() * 1.6)
+  }
+
+  /**
+   * Bandeau d'une section : intitule a gauche, totaux a droite, filet epais
+   * dessous.
+   *
+   * Le bandeau occupe toute la largeur de defilement, mais son contenu est
+   * cale sur la fenetre (`position: sticky`) : un intitule qui part hors de
+   * l'ecran des qu'on fait defiler horizontalement ne sert a rien, et c'est
+   * precisement quand on parcourt les colonnes de droite qu'on a besoin de
+   * savoir dans quel mois on se trouve.
+   */
+  private buildSectionHeader(index: number, section: SectionInfo): HTMLElement {
+    const cfg = this.options.sections!
+    const hauteur = this.sectionHeight()
+
+    const intitule = cfg.label
+      ? cfg.label(section)
+      : (section.label ?? this.formatGroupKey(cfg.column, section.value))
+
+    const gauche = el('div', {
+      class: `${NS}-section-title`,
+      children: [
+        el('span', { text: intitule }),
+        el('span', { class: `${NS}-section-count`, text: `(${this.t.number(section.count)})` }),
+      ],
+    })
+
+    const droite = el('div', { class: `${NS}-section-totals` })
+    for (const columnId of cfg.totals ?? []) {
+      const valeur = section.totals?.[columnId]
+      if (valeur == null) continue
+      const def = this.columnModel.getDef(columnId) as ColumnDef<TRow> | undefined
+      droite.append(el('span', {
+        class: `${NS}-section-total`,
+        children: [
+          el('span', { class: `${NS}-section-total-label`, text: def?.header ?? columnId }),
+          el('span', {
+            class: `${NS}-section-total-value`,
+            text: def ? this.formatAggregate(def, valeur) : String(valeur),
+          }),
+        ],
+      }))
+    }
+
+    const interieur = el('div', {
+      class: `${NS}-section-inner`,
+      children: [gauche, droite],
+      style: { width: `${this.viewport.clientWidth}px` },
+    })
+
+    return el('div', {
+      class: `${NS}-section`,
+      attrs: { role: 'row', 'data-section-for': String(index) },
+      style: {
+        height: `${hauteur}px`,
+        transform: `translateY(${this.detailLayout.offsetOf(index) - hauteur}px)`,
+      },
+      children: [interieur],
+    })
+  }
+
   private buildRequestContext() {
     const state = this.columnModel.getState()
     const filters: GridState['filters'] = {}
@@ -754,6 +903,17 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       }
     }
 
+    for (const [index, bandeau] of this.sectionNodes) {
+      if (index < start || index >= end || !this.sectionStarts.has(index)) {
+        bandeau.remove()
+        this.sectionNodes.delete(index)
+      } else {
+        // La largeur de la fenetre a pu changer depuis la construction.
+        const interieur = bandeau.firstElementChild as HTMLElement | null
+        if (interieur) interieur.style.width = `${this.viewport.clientWidth}px`
+      }
+    }
+
     const columns = this.columnModel.getRenderColumns()
     for (let i = start; i < end; i++) {
       const existing = this.renderedRows.get(i)
@@ -765,6 +925,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         if (!wasSkeleton || !display) continue
         existing.remove()
         this.renderedRows.delete(i)
+      }
+
+      const section = this.sectionStarts.get(i)
+      if (section && !this.sectionNodes.has(i)) {
+        const bandeau = this.buildSectionHeader(i, section)
+        this.sectionNodes.set(i, bandeau)
+        this.bodyEl.append(bandeau)
       }
 
       const node = display?.kind === 'group'
@@ -1448,6 +1615,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.cache.requestContext = this.buildRequestContext()
     this.viewport.scrollTop = 0
     this.renderedRows.clear()
+    this.sectionNodes.clear()
     this.bodyEl.replaceChildren()
     this.rebuildGroups()
     this.groupPanel?.render()
@@ -1461,6 +1629,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.refreshVisibleRange()
     this.renderStatus()
     this.renderOverlay()
+    // Les frontieres dependent des filtres : un rechargement les invalide.
+    this.sectionsSignature = null
+    void this.fetchSections()
   }
 
   setRows(rows: TRow[]): void {

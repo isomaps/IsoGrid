@@ -79,12 +79,48 @@ trait InteractsWithIsoGrid
         return 500;
     }
 
+    /**
+     * Découpage en sections (intertitres), ou `null` pour aucun.
+     *
+     * Doit correspondre à l'option `sections` déclarée côté grille : la vue
+     * décide de l'apparence, le serveur des frontières et des totaux. La
+     * colonne doit figurer dans `isoGridColumns()`.
+     *
+     *     return [
+     *         'column' => 'mois',              // clé de découpage
+     *         'label' => 'mois_libelle',       // intitulé lisible, facultatif
+     *         'direction' => 'desc',
+     *         'totals' => ['montant'],
+     *     ];
+     *
+     * @return null|array{column: string, label?: string, direction?: string, totals?: array<int, string>}
+     */
+    protected function isoGridSectionsConfig(): ?array
+    {
+        return null;
+    }
+
     private function isoGridResolver(array $payload): IsoGridQuery
     {
-        return IsoGridQuery::fromArray($payload)
+        $resolver = IsoGridQuery::fromArray($payload)
             ->allow($this->isoGridColumns())
             ->searchable($this->isoGridSearchable())
             ->maxPageSize($this->isoGridMaxPageSize());
+
+        // Le découpage s'applique AUSSI aux lignes : sans lui dans `respond()`,
+        // les lignes d'un même mois ne se suivraient pas et les intertitres
+        // tomberaient au hasard.
+        $sections = $this->isoGridSectionsConfig();
+        if ($sections !== null) {
+            $resolver->sections(
+                (string) $sections['column'],
+                (string) ($sections['direction'] ?? 'desc'),
+                (array) ($sections['totals'] ?? []),
+                isset($sections['label']) ? (string) $sections['label'] : null,
+            );
+        }
+
+        return $resolver;
     }
 
     /**
@@ -117,5 +153,25 @@ trait InteractsWithIsoGrid
         ])->setValues($this->isoGridQuery(), $column);
 
         return ['values' => $values];
+    }
+
+    /**
+     * Frontières et totaux des sections, pour le jeu filtré entier.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{sections: array<int, array{value: mixed, count: int, totals: array<string, float>}>}
+     */
+    public function isoGridSections(array $payload): array
+    {
+        if ($this->isoGridSectionsConfig() === null) {
+            return ['sections' => []];
+        }
+
+        $sections = $this->isoGridResolver([
+            'filters' => $payload['filters'] ?? [],
+            'quickFilter' => $payload['quickFilter'] ?? '',
+        ])->sectionCounts($this->isoGridQuery());
+
+        return ['sections' => $sections];
     }
 }
