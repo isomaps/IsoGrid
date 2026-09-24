@@ -176,6 +176,20 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     })
 
     const datasource = this.resolveDatasource()
+    // Groupage relu de l'état (URL, localStorage) en mode SERVEUR : il ne peut
+    // pas passer par l'arbre en mémoire, qui n'aurait aucune ligne — la grille
+    // restait sur « Chargement… » (24/09/2026). Il devient un groupage serveur.
+    if (!this.clientSource && this.grouping.isActive()) {
+      const groupes = this.grouping.getGroupBy()
+      this.grouping.setGroupBy([])
+      const colonne = datasource.getSections ? groupes[groupes.length - 1] ?? null : null
+      this.serverGroup = colonne
+      this.serverExpanded = new Set(colonne !== null ? options.initialState?.expandedGroups ?? [] : [])
+      this.columnModel.setGroupingColumns(
+        colonne !== null ? [colonne] : [],
+        colonne !== null ? { width: options.groupColumnWidth ?? DEFAULTS.groupColumnWidth } : false,
+      )
+    }
     this.cache = new BlockCache<TRow>({
       datasource,
       blockSize: options.blockSize ?? DEFAULTS.blockSize,
