@@ -44,6 +44,7 @@ function serialize(request: DataRequest): Record<string, unknown> {
     filters: request.filters,
     quickFilter: request.quickFilter,
     columns: request.columns,
+    ...(request.groupBy ? { groupBy: request.groupBy } : {}),
   }
 }
 
@@ -104,6 +105,7 @@ export function createLivewireDatasource<TRow = AnyRow>(
       const raw = await callAbortable(sectionsMethod, {
         filters: request.filters,
         quickFilter: request.quickFilter,
+        ...(request.groupBy ? { groupBy: request.groupBy } : {}),
       }, request.signal) as unknown
 
       const sections = (raw as Record<string, unknown>)?.sections ?? raw

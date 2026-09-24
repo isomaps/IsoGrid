@@ -39,6 +39,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private columnModel: ColumnModel
   private cache: BlockCache<TRow>
   private clientSource?: ClientDatasource<TRow>
+  /**
+   * Groupage demandé en mode SERVEUR (« Grouper par cette colonne ») : il
+   * prend la forme d'intertitres, découpés et totalisés par la source. Le
+   * groupage arborescent exige toutes les lignes en mémoire — impossible ici.
+   */
+  private serverGroup: string | null = null
   private selection: SelectionModel
   private grouping: GroupingModel<TRow>
   private details = new DetailModel()
@@ -221,7 +227,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     // Les intertitres dépendent des filtres : s'ils sont encore attendus du
     // dépôt d'état, on les demandera une fois l'état appliqué.
-    if (this.options.sections && !this.stateLoading) void this.fetchSections()
+    if (this.sectionsConfig() && !this.stateLoading) void this.fetchSections()
   }
 
   /**
@@ -304,7 +310,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       this.stateLoading = false
       this.render()
       this.refreshVisibleRange()
-      if (this.options.sections) void this.fetchSections()
+      if (this.sectionsConfig()) void this.fetchSections()
     }
 
     const delai = this.options.stateStore?.loadTimeout ?? DEFAULTS.stateLoadTimeout
@@ -685,11 +691,18 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * apparaître ou disparaître, et les colonnes groupées être masquées.
    */
   private applyRowGroup(columnIds: string[]): void {
-    if (columnIds.length > 0 && !this.clientSource) {
-      console.warn(
-        '[IsoGrid] rowGroup est ignoré en mode serveur : le groupage exige '
-        + "l'ensemble des lignes en mémoire.",
-      )
+    if (!this.clientSource) {
+      // Mode serveur : un seul niveau, rendu en intertitres par la source.
+      const suivant = columnIds.length > 0 ? columnIds[columnIds.length - 1] : null
+      if (suivant !== null && !this.resolveDatasource().getSections) {
+        console.warn('[IsoGrid] groupage impossible : la source ne sert pas de sections (getSections).')
+        return
+      }
+      if (suivant === this.serverGroup) return
+      this.serverGroup = suivant
+      this.reload()
+      this.emitState()
+      this.options.onRowGroupChanged?.(suivant !== null ? [suivant] : [], this)
       return
     }
 
@@ -997,7 +1010,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * fixe et que la source ordonne par elle en premier.
    */
   private async fetchSections(): Promise<void> {
-    if (!this.options.sections) return
+    if (!this.sectionsConfig()) return
     const source = this.resolveDatasource()
     if (!source.getSections) return
 
@@ -1011,6 +1024,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         filters: context.filters,
         quickFilter: context.quickFilter,
         columns: context.columns,
+        ...(context.groupBy ? { groupBy: context.groupBy } : {}),
       })
       if (this.destroyed) return
       this.sectionsSignature = signature
@@ -1037,7 +1051,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    */
   private applySectionLayout(): void {
     this.sectionStarts.clear()
-    const cfg = this.options.sections
+    const cfg = this.sectionsConfig()
     if (!cfg || this.sections.length === 0) return
     // Groupage et sections decoupent tous deux le corps : les cumuler
     // donnerait deux hierarchies concurrentes, illisibles.
@@ -1055,7 +1069,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   private sectionHeight(): number {
-    const cfg = this.options.sections
+    const cfg = this.sectionsConfig()
     return cfg?.height ?? Math.round(this.rowHeight() * 1.6)
   }
 
@@ -1070,7 +1084,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * savoir dans quel mois on se trouve.
    */
   private buildSectionHeader(index: number, section: SectionInfo): HTMLElement {
-    const cfg = this.options.sections!
+    const cfg = this.sectionsConfig()!
     const hauteur = this.sectionHeight()
 
     const intitule = cfg.label
@@ -1090,7 +1104,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // large que la fenêtre, et l'œil devait traverser tout l'écran pour relier
     // un mois à son montant.
     const droite = el('div', { class: `${NS}-section-totals` })
-    for (const columnId of cfg.totals ?? []) {
+    for (const columnId of cfg.totals ?? Object.keys(section.totals ?? {})) {
       const valeur = section.totals?.[columnId]
       if (valeur == null) continue
       const def = this.columnModel.getDef(columnId) as ColumnDef<TRow> | undefined
@@ -1151,6 +1165,24 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       filters,
       quickFilter: state.quickFilter,
       columns: this.columnModel.getRenderColumns().map(c => c.id),
+      ...(this.serverGroup ? { groupBy: this.serverGroup } : {}),
+    }
+  }
+
+  /**
+   * Le découpage en intertitres en vigueur : celui de la page, ou celui que
+   * l'utilisateur a demandé par « Grouper par cette colonne » en mode
+   * serveur. Les totaux de la page (et leurs libellés) sont conservés ; à
+   * défaut, la source totalise ce qu'elle sait totaliser.
+   */
+  private sectionsConfig(): IsoGridOptions<TRow>['sections'] {
+    if (this.serverGroup === null) return this.options.sections
+    const base = this.options.sections
+    return {
+      column: this.serverGroup,
+      height: base?.height,
+      totals: base?.totals,
+      totalLabels: base?.totalLabels,
     }
   }
 
@@ -1825,7 +1857,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   getState(): GridState {
     return {
       ...this.columnModel.getState(),
-      rowGroup: this.grouping.getGroupBy(),
+      rowGroup: this.getRowGroup(),
       expandedGroups: this.grouping.getExpanded(),
       openDetails: this.details.getOpen(),
     }
@@ -2296,7 +2328,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   /* --- groupage --- */
 
   getRowGroup(): string[] {
+    if (!this.clientSource) return this.serverGroup !== null ? [this.serverGroup] : []
     return this.grouping.getGroupBy()
+  }
+
+  canRowGroup(): boolean {
+    return this.clientSource !== undefined || typeof this.resolveDatasource().getSections === 'function'
+  }
+
+  hasCollapsibleGroups(): boolean {
+    return this.clientSource !== undefined
   }
 
   setRowGroup(columnIds: string[]): void {
@@ -2304,13 +2345,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   addRowGroup(columnId: string): void {
-    const current = this.grouping.getGroupBy()
+    const current = this.getRowGroup()
     if (current.includes(columnId)) return
     this.applyRowGroup([...current, columnId])
   }
 
   removeRowGroup(columnId: string): void {
-    this.applyRowGroup(this.grouping.getGroupBy().filter(id => id !== columnId))
+    this.applyRowGroup(this.getRowGroup().filter(id => id !== columnId))
   }
 
   expandAllGroups(): void {

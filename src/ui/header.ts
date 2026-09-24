@@ -356,7 +356,11 @@ export class HeaderRenderer {
     // Groupage : proposé seulement si la colonne l'autorise et n'est pas déjà
     // un niveau — et jamais sur les colonnes techniques.
     const grouped = this.ctx.api.getRowGroup()
+    // En mode serveur sans sections, le groupage est impossible : le menu ne
+    // le propose pas plutôt que d'offrir un clic sans effet (constaté le
+    // 24/09/2026 sur les factures d'iso-crm).
     const groupable = def.enableRowGroup !== false
+      && this.ctx.api.canRowGroup()
       && column.id !== SELECTION_COLUMN_ID
       && column.id !== GROUP_COLUMN_ID
     if (groupable) {
@@ -364,7 +368,7 @@ export class HeaderRenderer {
       menu.append(grouped.includes(column.id)
         ? item('close', t.t('ungroup'), () => this.ctx.api.removeRowGroup(column.id), true)
         : item('grip', t.t('groupBy'), () => this.ctx.api.addRowGroup(column.id)))
-      if (grouped.length > 0) {
+      if (grouped.length > 0 && this.ctx.api.hasCollapsibleGroups()) {
         menu.append(item('chevron-down', t.t('expandAllGroups'), () => this.ctx.api.expandAllGroups()))
         menu.append(item('chevron-right', t.t('collapseAllGroups'), () => this.ctx.api.collapseAllGroups()))
       }

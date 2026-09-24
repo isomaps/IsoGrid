@@ -116,6 +116,22 @@ trait InteractsWithIsoGrid
         return [];
     }
 
+    /**
+     * Colonnes autorisées indexées par identifiant (`isoGridColumns()` accepte
+     * aussi une simple liste de noms).
+     *
+     * @return array<string, mixed>
+     */
+    private function isoGridColumnsParCle(): array
+    {
+        $parCle = [];
+        foreach ($this->isoGridColumns() as $cle => $valeur) {
+            $parCle[is_int($cle) ? (string) $valeur : (string) $cle] = $valeur;
+        }
+
+        return $parCle;
+    }
+
     private function isoGridResolver(array $payload): IsoGridQuery
     {
         $resolver = IsoGridQuery::fromArray($payload)
@@ -128,6 +144,24 @@ trait InteractsWithIsoGrid
         // les lignes d'un même mois ne se suivraient pas et les intertitres
         // tomberaient au hasard.
         $sections = $this->isoGridSectionsConfig();
+
+        // « Grouper par cette colonne », demandé depuis le navigateur : il
+        // REMPLACE le découpage de la page, avec les mêmes totaux (à défaut,
+        // ceux du pied). La colonne doit être autorisée comme pour un tri —
+        // rien d'autre n'atteint le SQL.
+        $groupe = $payload['groupBy'] ?? null;
+        if (is_string($groupe) && $groupe !== '' && $groupe !== ($sections['column'] ?? null)
+            && array_key_exists($groupe, $this->isoGridColumnsParCle())) {
+            $resolver->sections(
+                $groupe,
+                'asc',
+                (array) ($sections['totals'] ?? $this->isoGridFooter()),
+                null,
+            );
+
+            return $resolver;
+        }
+
         if ($sections !== null) {
             $resolver->sections(
                 (string) $sections['column'],
@@ -180,13 +214,15 @@ trait InteractsWithIsoGrid
      */
     public function isoGridSections(array $payload): array
     {
-        if ($this->isoGridSectionsConfig() === null) {
+        $groupe = $payload['groupBy'] ?? null;
+        if ($this->isoGridSectionsConfig() === null && ! (is_string($groupe) && $groupe !== '')) {
             return ['sections' => []];
         }
 
         $sections = $this->isoGridResolver([
             'filters' => $payload['filters'] ?? [],
             'quickFilter' => $payload['quickFilter'] ?? '',
+            'groupBy' => $groupe,
         ])->sectionCounts($this->isoGridQuery());
 
         return ['sections' => $sections];

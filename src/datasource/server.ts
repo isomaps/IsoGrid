@@ -29,6 +29,7 @@ function serializeRequest(req: DataRequest): Record<string, unknown> {
     filters: req.filters,
     quickFilter: req.quickFilter,
     columns: req.columns,
+    ...(req.groupBy ? { groupBy: req.groupBy } : {}),
   }
 }
 

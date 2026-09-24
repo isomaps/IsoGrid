@@ -276,6 +276,12 @@ export interface DataRequest {
   quickFilter: string
   /** Colonnes actuellement visibles — permet au serveur de restreindre son SELECT. */
   columns: string[]
+  /**
+   * Colonne de groupage demandée par l'utilisateur (« Grouper par cette
+   * colonne ») en mode serveur. La source ordonne par elle en premier et
+   * découpe ses sections dessus. Absente : le découpage de la page.
+   */
+  groupBy?: string
   signal?: AbortSignal
 }
 
@@ -875,6 +881,16 @@ export interface IsoGridApi<TRow = AnyRow> {
 
   /* --- groupage --- */
   getRowGroup(): string[]
+  /**
+   * La grille sait-elle grouper ? Toujours en mode client ; en mode serveur,
+   * seulement si la source sert des sections (`getSections`).
+   */
+  canRowGroup(): boolean
+  /**
+   * Les groupes se replient-ils ? Oui en mode client (arborescence) ; non en
+   * mode serveur, où le groupage prend la forme d'intertitres.
+   */
+  hasCollapsibleGroups(): boolean
   setRowGroup(columnIds: string[]): void
   addRowGroup(columnId: string): void
   removeRowGroup(columnId: string): void
