@@ -167,9 +167,34 @@ final class IsoGridQuery
      * décision de page, pas une option que le navigateur négocie. Il doit
      * malgré tout figurer dans `allow()`, comme toute colonne touchee par du SQL.
      *
-     * @param  array<int, string>  $totals  identifiants de colonnes à sommer
+     * @param  array<int|string, string|array<int|string, string>>  $totals
+     *   colonnes à sommer : `['montant']`, ou `['montant' => ['sum', 'par' => 'devise']]`
+     *   pour un total PAR DEVISE — une colonne qui mêle francs et euros ne
+     *   s'additionne pas.
      * @param  string|null  $labelColumn  colonne portant l'intitulé lisible
      */
+    /**
+     * @param  array<int|string, string|array<int|string, string>>  $totals
+     * @return array<int, array{id: string, par: string|null}>
+     */
+    private static function normaliserTotaux(array $totals): array
+    {
+        $liste = [];
+        foreach ($totals as $cle => $regle) {
+            if (is_int($cle)) {
+                $liste[] = ['id' => (string) $regle, 'par' => null];
+
+                continue;
+            }
+            $liste[] = [
+                'id' => (string) $cle,
+                'par' => is_array($regle) && isset($regle['par']) ? (string) $regle['par'] : null,
+            ];
+        }
+
+        return $liste;
+    }
+
     public function sections(
         string $columnId,
         string $direction = 'desc',
@@ -179,7 +204,7 @@ final class IsoGridQuery
         $this->sections = [
             'column' => $columnId,
             'direction' => strtolower($direction) === 'asc' ? 'asc' : 'desc',
-            'totals' => array_values($totals),
+            'totals' => self::normaliserTotaux($totals),
             // L'intitulé vient du SERVEUR et non du navigateur : « Décembre
             // 2026 » dépend de la langue, et MySQL ne nomme les mois en
             // français que si `lc_time_names` est réglé — ce qu'on ne peut pas
@@ -568,6 +593,10 @@ final class IsoGridQuery
         $sousJacente->columns = null;
         $sousJacente->orders = null;
 
+        // Copie VIERGE (filtrée, sans colonnes ni tri) pour les totaux par devise,
+        // qui demandent leur propre GROUP BY (section, devise).
+        $vierge = clone $base;
+
         $base->selectRaw($expression.' as section_value')->selectRaw('count(*) as section_count');
 
         $libelle = $this->sections['label'] !== null ? $this->resolve($this->sections['label']) : null;
@@ -576,11 +605,36 @@ final class IsoGridQuery
         }
 
         $totaux = [];
-        foreach ($this->sections['totals'] as $id) {
+        $parDevise = [];
+        foreach ($this->sections['totals'] as ['id' => $id, 'par' => $par]) {
             $colonne = $this->resolve($id);
             if ($colonne === null) {
                 continue;
             }
+
+            // Total PAR DEVISE : une requête groupée par (section, devise), fusionnée
+            // ensuite dans chaque section sous la forme { CHF: …, EUR: … }.
+            $parColonne = $par !== null ? $this->resolve($par) : null;
+            if ($parColonne !== null) {
+                $parSql = $this->expressionSql($parColonne);
+                $lignes = (clone $vierge)
+                    ->selectRaw($expression.' as sv')
+                    ->selectRaw($parSql.' as cle')
+                    ->selectRaw('sum('.$this->expressionSql($colonne).') as v')
+                    ->groupByRaw($expression)
+                    ->groupByRaw($parSql)
+                    ->orderByRaw($parSql)
+                    ->get();
+                foreach ($lignes as $l) {
+                    if ($l->cle === null || $l->cle === '') {
+                        continue;
+                    }
+                    $parDevise[(string) $l->sv][$id][(string) $l->cle] = (float) $l->v;
+                }
+
+                continue;
+            }
+
             // L'alias est indexé et non construit sur l'identifiant : un nom
             // de colonne exposé peut contenir de quoi casser l'alias.
             $alias = 'section_total_'.count($totaux);
@@ -598,10 +652,13 @@ final class IsoGridQuery
             ->groupByRaw($expression)
             ->orderByRaw($expression.' '.$this->sections['direction'])
             ->get()
-            ->map(function ($row) use ($totaux): array {
+            ->map(function ($row) use ($totaux, $parDevise): array {
                 $sommes = [];
                 foreach ($totaux as $alias => $id) {
                     $sommes[$id] = (float) ($row->{$alias} ?? 0);
+                }
+                foreach ($parDevise[(string) $row->section_value] ?? [] as $id => $carte) {
+                    $sommes[$id] = $carte;
                 }
 
                 $section = [

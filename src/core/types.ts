@@ -316,8 +316,11 @@ export interface SectionInfo {
   label?: string
   /** Nombre de lignes de la section — c'est lui qui donne les frontières. */
   count: number
-  /** Totaux par colonne, déjà agrégés par la source. */
-  totals?: Record<string, number>
+  /**
+   * Totaux par colonne, déjà agrégés par la source. Un total peut être un
+   * nombre, ou `{ CHF: …, EUR: … }` quand la colonne mêle des devises.
+   */
+  totals?: Record<string, number | Record<string, number>>
 }
 
 export interface Datasource<TRow = AnyRow> {

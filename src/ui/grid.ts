@@ -1096,7 +1096,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           el('span', { class: `${NS}-section-total-label`, text: def?.header ?? columnId }),
           el('span', {
             class: `${NS}-section-total-value`,
-            text: def ? this.formatAggregate(def, valeur) : String(valeur),
+            // Un total par devise s'écrit « CHF 1 234,56 · EUR 5 678,90 » :
+            // chaque montant avec son unité, jamais additionnés entre eux.
+            text: typeof valeur === 'object'
+              ? Object.entries(valeur)
+                .map(([cle, v]) => `${cle} ${def ? this.formatAggregate(def, v) : String(v)}`)
+                .join(' · ')
+              : (def ? this.formatAggregate(def, valeur) : String(valeur)),
           }),
         ],
       }))
