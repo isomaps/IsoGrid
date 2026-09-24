@@ -9,6 +9,9 @@ import {
   type SelectionSnapshot, type SelectionState,
 } from '../core/selection'
 import { GROUP_COLUMN_ID, GroupingModel, type DisplayRow } from '../core/grouping'
+
+/** Préfixe des chemins de groupes servis par la source (groupage serveur). */
+const SERVER_GROUP_PREFIX = '\u0001srv:'
 import { DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID, DetailLayout, DetailModel } from '../core/detail'
 import { Translator, resolveLocale } from '../core/i18n'
 import { BlockCache, createHttpDatasource } from '../datasource/server'
@@ -45,6 +48,14 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * groupage arborescent exige toutes les lignes en mémoire — impossible ici.
    */
   private serverGroup: string | null = null
+  /** Groupes ouverts en groupage serveur (clé = valeur du groupe). Replié par défaut. */
+  private serverExpanded = new Set<string>()
+  /**
+   * Plan d'affichage du groupage serveur : pour chaque groupe, son index
+   * d'affichage (sa ligne de groupe) et l'index SOURCE de sa première ligne.
+   * Reconstruit à l'arrivée des sections et à chaque dépliage.
+   */
+  private serverPlan: { display: number[]; source: number[]; count: number } | null = null
   private selection: SelectionModel
   private grouping: GroupingModel<TRow>
   private details = new DetailModel()
@@ -673,12 +684,82 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   /** Nombre de lignes à représenter : groupes compris quand le groupage est actif. */
   private displayRowCount(): number {
+    if (this.serverPlan) return this.serverPlan.count
     return this.grouping.isActive()
       ? this.grouping.getDisplayRowCount()
       : this.cache.getVirtualRowCount()
   }
 
+  /**
+   * Groupage serveur : une ligne par groupe, et ses lignes seulement s'il est
+   * ouvert. Les groupes arrivent de `getSections()` (valeur, effectif,
+   * totaux) ; les lignes, du cache par blocs, à leur index SOURCE.
+   */
+  private rebuildServerPlan(): void {
+    if (this.serverGroup === null || this.sections.length === 0) {
+      this.serverPlan = null
+      return
+    }
+    const display: number[] = []
+    const source: number[] = []
+    let d = 0
+    let src = 0
+    for (const section of this.sections) {
+      display.push(d)
+      source.push(src)
+      const n = Math.max(0, Math.round(section.count))
+      d += 1 + (this.serverExpanded.has(String(section.value)) ? n : 0)
+      src += n
+    }
+    this.serverPlan = { display, source, count: d }
+  }
+
+  /** Groupe (index dans `sections`) contenant l'index d'affichage donné. */
+  private serverGroupAt(index: number): number {
+    const display = this.serverPlan!.display
+    let lo = 0
+    let hi = display.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1
+      if (display[mid]! <= index) lo = mid
+      else hi = mid - 1
+    }
+    return lo
+  }
+
+  /** Index SOURCE d'une ligne affichée, `null` pour une ligne de groupe. */
+  private serverSourceIndex(index: number): number | null {
+    const k = this.serverGroupAt(index)
+    const offset = index - this.serverPlan!.display[k]!
+    return offset === 0 ? null : this.serverPlan!.source[k]! + offset - 1
+  }
+
+  private serverDisplayRow(index: number): DisplayRow<TRow> | undefined {
+    const k = this.serverGroupAt(index)
+    const section = this.sections[k]
+    if (!section) return undefined
+    if (index === this.serverPlan!.display[k]) {
+      return {
+        kind: 'group',
+        expanded: this.serverExpanded.has(String(section.value)),
+        node: {
+          path: SERVER_GROUP_PREFIX + String(section.value),
+          key: section.label ?? section.value,
+          columnId: this.serverGroup!,
+          level: 0,
+          count: section.count,
+          aggregates: (section.totals ?? {}) as Record<string, unknown>,
+          children: [],
+          leaves: [],
+        },
+      }
+    }
+    const row = this.cache.getRow(this.serverSourceIndex(index)!)
+    return row ? { kind: 'leaf', row, level: 1 } : undefined
+  }
+
   private displayRow(index: number): DisplayRow<TRow> | undefined {
+    if (this.serverPlan) return this.serverDisplayRow(index)
     if (this.grouping.isActive()) return this.grouping.getDisplayRow(index)
     const row = this.cache.getRow(index)
     return row ? { kind: 'leaf', row, level: 0 } : undefined
@@ -700,6 +781,14 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       }
       if (suivant === this.serverGroup) return
       this.serverGroup = suivant
+      this.serverExpanded.clear()
+      this.serverPlan = null
+      // Même présentation que le groupage client : une colonne d'arborescence
+      // en tête (chevron, valeur, effectif), la colonne groupée masquée.
+      this.columnModel.setGroupingColumns(
+        suivant !== null ? [suivant] : [],
+        suivant !== null ? { width: this.options.groupColumnWidth ?? DEFAULTS.groupColumnWidth } : false,
+      )
       this.reload()
       this.emitState()
       this.options.onRowGroupChanged?.(suivant !== null ? [suivant] : [], this)
@@ -992,7 +1081,23 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.cache.requestContext = this.buildRequestContext()
     // En groupage, les lignes viennent de l'arbre en mémoire : demander des
     // blocs au cache n'aurait aucun effet sur ce qui est affiché.
-    if (!this.grouping.isActive()) this.cache.ensureRange(start, end)
+    if (this.serverPlan) {
+      // Seules les lignes des groupes OUVERTS dans la fenêtre sont demandées,
+      // par séries contiguës d'index source : un groupe replié ne coûte rien.
+      let debut: number | null = null
+      let fin = 0
+      for (let i = start; i < end; i++) {
+        const src = this.serverSourceIndex(i)
+        if (src === null) continue
+        if (debut !== null && src === fin) { fin++; continue }
+        if (debut !== null) this.cache.ensureRange(debut, fin)
+        debut = src
+        fin = src + 1
+      }
+      if (debut !== null) this.cache.ensureRange(debut, fin)
+    } else if (!this.grouping.isActive()) {
+      this.cache.ensureRange(start, end)
+    }
     this.renderBody()
   }
 
@@ -1029,6 +1134,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (this.destroyed) return
       this.sectionsSignature = signature
       this.sections = Array.isArray(sections) ? sections : []
+      if (this.serverGroup !== null) {
+        this.rebuildServerPlan()
+        this.render()
+        this.refreshVisibleRange()
+        return
+      }
     } catch (error) {
       // Mieux vaut aucun intertitre qu'un intertitre au mauvais endroit : on
       // n'invente pas de frontieres, et la grille reste utilisable.
@@ -1055,7 +1166,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     if (!cfg || this.sections.length === 0) return
     // Groupage et sections decoupent tous deux le corps : les cumuler
     // donnerait deux hierarchies concurrentes, illisibles.
-    if (this.grouping.isActive()) return
+    if (this.grouping.isActive() || this.serverGroup !== null) return
 
     const height = cfg.height ?? Math.round(this.rowHeight() * 1.6)
     const total = this.totalRowCount()
@@ -1499,14 +1610,22 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         }))
         cell.append(el('span', { class: `${NS}-group-count`, text: `(${this.t.number(group.count)})` }))
       } else if (column.id === SELECTION_COLUMN_ID) {
-        cell.append(this.buildGroupCheckbox(group))
+        // Un groupe serveur ne connaît pas ses lignes tant qu'il est replié :
+        // une case « tout le groupe » mentirait.
+        if (!group.path.startsWith(SERVER_GROUP_PREFIX)) cell.append(this.buildGroupCheckbox(group))
       } else {
         const agg = group.aggregates[column.id]
         if (agg != null) {
           const def = column.def as ColumnDef<TRow>
           cell.classList.add(`${NS}-cell-agg`)
           if (!def.align && def.type === 'number') cell.classList.add(`${NS}-align-right`)
-          cell.textContent = this.formatAggregate(def, agg)
+          // Total par devise (source serveur) : « 85,20 EUR · 216,20 USD »,
+          // jamais additionnés entre eux.
+          cell.textContent = typeof agg === 'object'
+            ? Object.entries(agg as Record<string, number>)
+              .map(([devise, v]) => `${this.formatAggregate(def, v)} ${devise}`).join(' · ')
+            : this.formatAggregate(def, agg)
+          if (typeof agg === 'object') cell.title = cell.textContent
         }
       }
       row.append(cell)
@@ -1563,6 +1682,18 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   private toggleGroup(path: string): void {
+    if (path.startsWith(SERVER_GROUP_PREFIX)) {
+      const cle = path.slice(SERVER_GROUP_PREFIX.length)
+      if (this.serverExpanded.has(cle)) this.serverExpanded.delete(cle)
+      else this.serverExpanded.add(cle)
+      this.rebuildServerPlan()
+      this.renderedRows.clear()
+      this.bodyEl.replaceChildren()
+      this.refreshVisibleRange()
+      this.renderStatus()
+      this.emitState()
+      return
+    }
     this.grouping.toggle(path)
     this.renderedRows.clear()
     this.bodyEl.replaceChildren()
@@ -1858,7 +1989,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return {
       ...this.columnModel.getState(),
       rowGroup: this.getRowGroup(),
-      expandedGroups: this.grouping.getExpanded(),
+      expandedGroups: this.serverGroup !== null ? [...this.serverExpanded] : this.grouping.getExpanded(),
       openDetails: this.details.getOpen(),
     }
   }
@@ -1867,7 +1998,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.columnModel.setState(state)
     if (state.rowGroup) this.applyRowGroup(state.rowGroup)
     if (state.expandedGroups) {
-      this.grouping.setExpanded(state.expandedGroups)
+      if (this.serverGroup !== null) {
+        this.serverExpanded = new Set(state.expandedGroups)
+        this.rebuildServerPlan()
+      } else {
+        this.grouping.setExpanded(state.expandedGroups)
+      }
       this.render()
     }
     if (state.openDetails) {
@@ -2147,6 +2283,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       this.sections = []
       this.sectionStarts.clear()
       this.sectionsSignature = null
+      this.serverPlan = null
     }
     this.lastError = null
     this.cache.invalidate()
@@ -2337,7 +2474,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   hasCollapsibleGroups(): boolean {
-    return this.clientSource !== undefined
+    return this.clientSource !== undefined || this.serverGroup !== null
   }
 
   setRowGroup(columnIds: string[]): void {
@@ -2355,11 +2492,25 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   expandAllGroups(): void {
+    if (this.serverGroup !== null) {
+      for (const section of this.sections) this.serverExpanded.add(String(section.value))
+      this.rebuildServerPlan()
+      this.render()
+      this.refreshVisibleRange()
+      return
+    }
     this.grouping.expandAll()
     this.render()
   }
 
   collapseAllGroups(): void {
+    if (this.serverGroup !== null) {
+      this.serverExpanded.clear()
+      this.rebuildServerPlan()
+      this.render()
+      this.refreshVisibleRange()
+      return
+    }
     this.grouping.collapseAll()
     this.render()
   }
