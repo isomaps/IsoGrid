@@ -658,8 +658,15 @@ export interface IsoGridOptions<TRow = AnyRow> {
     column: string
     /** Hauteur de l'intertitre. Défaut : 1,6 × la hauteur de ligne. */
     height?: number
-    /** Colonnes à totaliser, affichées à droite de l'intitulé. */
+    /** Colonnes à totaliser, affichées à la suite de l'intitulé. */
     totals?: string[]
+    /**
+     * Libellé de chaque total, par colonne. À défaut, l'en-tête de la colonne.
+     * Utile quand l'en-tête prête à confusion dans un intertitre : une colonne
+     * « CHF » donnait « CHF 811,84 », qu'on lisait comme une devise de plus
+     * à côté des totaux par devise.
+     */
+    totalLabels?: Record<string, string>
     /** Intitulé sur mesure ; à défaut, le libellé fourni par la source. */
     label?: (section: SectionInfo) => string
   }

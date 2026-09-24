@@ -1085,25 +1085,38 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       ],
     })
 
+    // Les totaux suivent l'intitulé au lieu d'être poussés contre le bord
+    // droit : collés au bord, ils étaient coupés dès que la grille était plus
+    // large que la fenêtre, et l'œil devait traverser tout l'écran pour relier
+    // un mois à son montant.
     const droite = el('div', { class: `${NS}-section-totals` })
     for (const columnId of cfg.totals ?? []) {
       const valeur = section.totals?.[columnId]
       if (valeur == null) continue
       const def = this.columnModel.getDef(columnId) as ColumnDef<TRow> | undefined
+      const montant = (v: number) => (def ? this.formatAggregate(def, v) : String(v))
+
+      // Un total par devise : une pastille par devise, montant d'abord et
+      // devise ensuite (« 401,20 EUR »), comme on l'écrit en français — jamais
+      // additionnés entre eux.
+      const valeurs = typeof valeur === 'object'
+        ? Object.entries(valeur).map(([devise, v]) => el('span', {
+            class: `${NS}-section-chip`,
+            children: [
+              el('span', { class: `${NS}-section-total-value`, text: montant(v) }),
+              el('span', { class: `${NS}-section-chip-unit`, text: devise }),
+            ],
+          }))
+        : [el('span', { class: `${NS}-section-total-value`, text: montant(valeur) })]
+
       droite.append(el('span', {
         class: `${NS}-section-total`,
         children: [
-          el('span', { class: `${NS}-section-total-label`, text: def?.header ?? columnId }),
           el('span', {
-            class: `${NS}-section-total-value`,
-            // Un total par devise s'écrit « CHF 1 234,56 · EUR 5 678,90 » :
-            // chaque montant avec son unité, jamais additionnés entre eux.
-            text: typeof valeur === 'object'
-              ? Object.entries(valeur)
-                .map(([cle, v]) => `${cle} ${def ? this.formatAggregate(def, v) : String(v)}`)
-                .join(' · ')
-              : (def ? this.formatAggregate(def, valeur) : String(valeur)),
+            class: `${NS}-section-total-label`,
+            text: cfg.totalLabels?.[columnId] ?? def?.header ?? columnId,
           }),
+          ...valeurs,
         ],
       }))
     }
