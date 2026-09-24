@@ -104,6 +104,22 @@ export class FooterRenderer {
               ],
             }))
           }
+        } else if (fournie && typeof fournie === 'object' && !Array.isArray(fournie)) {
+          /* Un total PAR DEVISE renvoyé par la source : une ligne par devise,
+             comme les statistiques multiples. Sur une seule ligne, trois devises
+             ne tiennent pas dans une colonne de montants et seraient tronquées
+             — précisément la partie qu'on voulait lire. */
+          cellule.classList.add(`${NS}-footer-multi`)
+          for (const [cle, v] of Object.entries(fournie as Record<string, unknown>)) {
+            if (typeof v !== 'number') continue
+            cellule.append(el('span', {
+              class: `${NS}-footer-stat`,
+              children: [
+                el('span', { class: `${NS}-footer-stat-label`, text: cle }),
+                el('span', { class: `${NS}-footer-stat-value`, text: this.formate(def, v) }),
+              ],
+            }))
+          }
         } else {
           const brut = fournie !== undefined ? fournie : aggregate(valeurs, def.aggFunc!)
           cellule.textContent = this.formate(def, brut)
