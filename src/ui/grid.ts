@@ -150,18 +150,30 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // qu'une fois, au lieu de s'afficher puis de se réafficher autrement.
     const attente = this.loadPersistedState()
 
+    const datasource = this.resolveDatasource()
     const initialGroups = options.initialState?.rowGroup ?? options.rowGroup ?? []
-    if (initialGroups.length > 0) this.grouping.setGroupBy(initialGroups)
+    if (initialGroups.length > 0) {
+      if (this.clientSource) {
+        this.grouping.setGroupBy(initialGroups)
+      } else if (datasource.getSections) {
+        // Groupage relu de l'état (URL, localStorage) en mode SERVEUR : il ne
+        // peut pas passer par l'arbre en mémoire, qui n'aurait aucune ligne —
+        // la grille restait vide au rechargement (24/09/2026).
+        this.serverGroup = initialGroups[initialGroups.length - 1] ?? null
+        this.serverExpanded = new Set(options.initialState?.expandedGroups ?? [])
+      }
+    }
+    const groupes = this.serverGroup !== null ? [this.serverGroup] : this.grouping.getGroupBy()
 
     this.columnModel = new ColumnModel({
       columns: options.columns as ColumnDef[],
       selectionColumn: options.rowSelection === 'multiple' && options.selectionColumn !== false
         ? { width: options.selectionColumnWidth ?? DEFAULTS.selectionColumnWidth }
         : false,
-      groupColumn: this.grouping.isActive()
+      groupColumn: groupes.length > 0
         ? { width: options.groupColumnWidth ?? DEFAULTS.groupColumnWidth }
         : false,
-      groupedColumnIds: this.grouping.getGroupBy(),
+      groupedColumnIds: groupes,
       detailColumn: options.masterDetail
         ? { width: options.masterDetail.columnWidth ?? DEFAULTS.detailColumnWidth }
         : false,
@@ -175,21 +187,6 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       onChange: () => this.onColumnModelChange(),
     })
 
-    const datasource = this.resolveDatasource()
-    // Groupage relu de l'état (URL, localStorage) en mode SERVEUR : il ne peut
-    // pas passer par l'arbre en mémoire, qui n'aurait aucune ligne — la grille
-    // restait sur « Chargement… » (24/09/2026). Il devient un groupage serveur.
-    if (!this.clientSource && this.grouping.isActive()) {
-      const groupes = this.grouping.getGroupBy()
-      this.grouping.setGroupBy([])
-      const colonne = datasource.getSections ? groupes[groupes.length - 1] ?? null : null
-      this.serverGroup = colonne
-      this.serverExpanded = new Set(colonne !== null ? options.initialState?.expandedGroups ?? [] : [])
-      this.columnModel.setGroupingColumns(
-        colonne !== null ? [colonne] : [],
-        colonne !== null ? { width: options.groupColumnWidth ?? DEFAULTS.groupColumnWidth } : false,
-      )
-    }
     this.cache = new BlockCache<TRow>({
       datasource,
       blockSize: options.blockSize ?? DEFAULTS.blockSize,
