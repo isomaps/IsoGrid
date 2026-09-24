@@ -313,6 +313,9 @@ function etatPartageable(state: Partial<GridState>): Partial<GridState> {
   if (state.filters && Object.keys(state.filters).length > 0) partiel.filters = state.filters
   if (state.sort && state.sort.length > 0) partiel.sort = state.sort
   if (state.quickFilter) partiel.quickFilter = state.quickFilter
+  // Le groupage fait partie de la question (« par fournisseur ») ; les groupes
+  // ouverts, eux, sont un geste de lecture et restent hors du lien.
+  if (state.rowGroup && state.rowGroup.length > 0) partiel.rowGroup = state.rowGroup
   return partiel
 }
 

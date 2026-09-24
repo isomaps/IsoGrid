@@ -1632,11 +1632,21 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           if (!def.align && def.type === 'number') cell.classList.add(`${NS}-align-right`)
           // Total par devise (source serveur) : « 85,20 EUR · 216,20 USD »,
           // jamais additionnés entre eux.
-          cell.textContent = typeof agg === 'object'
-            ? Object.entries(agg as Record<string, number>)
-              .map(([devise, v]) => `${this.formatAggregate(def, v)} ${devise}`).join(' · ')
-            : this.formatAggregate(def, agg)
-          if (typeof agg === 'object') cell.title = cell.textContent
+          if (typeof agg === 'object') {
+            // Montants par devise calés à DROITE, comme les montants des
+            // lignes : trop longs pour la colonne, c'est le début qui est
+            // rogné, et l'infobulle donne le tout.
+            const parts = Object.entries(agg as Record<string, number>)
+              .map(([devise, v]) => `${this.formatAggregate(def, v)} ${devise}`)
+            cell.classList.add(`${NS}-cell-agg-multi`)
+            for (const [i, texte] of parts.entries()) {
+              if (i > 0) cell.append(el('span', { class: `${NS}-cell-agg-sep`, text: '·' }))
+              cell.append(el('span', { text: texte }))
+            }
+            cell.title = parts.join('  ·  ')
+          } else {
+            cell.textContent = this.formatAggregate(def, agg)
+          }
         }
       }
       row.append(cell)

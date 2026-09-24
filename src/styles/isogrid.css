@@ -1439,3 +1439,15 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 
 /* Variante neutre du message bref : ni réussite, ni échec. */
 .isg-toast-info { background: var(--isg-fg-muted, #6b7280); }
+
+/* Total par devise dans une ligne de groupe : calé à droite, le début rogné
+   si la colonne est trop étroite (le dernier montant reste lisible). */
+.isg-cell-agg-multi {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.isg-cell-agg-multi > span { flex: none; }
+.isg-cell-agg-sep { opacity: 0.45; }
