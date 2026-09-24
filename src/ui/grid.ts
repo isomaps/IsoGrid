@@ -1629,7 +1629,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         if (agg != null) {
           const def = column.def as ColumnDef<TRow>
           cell.classList.add(`${NS}-cell-agg`)
-          if (!def.align && def.type === 'number') cell.classList.add(`${NS}-align-right`)
+          // Même alignement que les cellules de la colonne : un total
+          // « CHF » calé à gauche sous des montants calés à droite se lisait mal.
+          const alignement = def.align ?? (def.type === 'number' ? 'right' : undefined)
+          if (alignement) cell.classList.add(`${NS}-align-${alignement}`)
           // Total par devise (source serveur) : « 85,20 EUR · 216,20 USD »,
           // jamais additionnés entre eux.
           if (typeof agg === 'object') {
