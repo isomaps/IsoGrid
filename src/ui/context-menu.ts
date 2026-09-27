@@ -14,9 +14,24 @@ import { NS, el, getPath, onDismiss } from './dom'
 export interface ContextMenuItem {
   /** Séparateur horizontal si `true` ; les autres champs sont ignorés. */
   separator?: boolean
+  /**
+   * Intertitre de section, non cliquable ; les autres champs sont ignorés.
+   * Pour un menu long que l'hôte range par thèmes (« Actions »,
+   * « Préparation / livraison »…) : des séparateurs seuls ne disent pas ce
+   * que chaque groupe contient.
+   */
+  heading?: string
   label?: string
   icon?: IconName
+  /**
+   * Pictogramme fourni par l'hôte, prioritaire sur `icon` : pour des entrées
+   * dont l'icône vient de SON jeu (paramétrage, police d'icônes maison), hors
+   * de la liste fermée d'`IconName`. Appelé à chaque ouverture du menu.
+   */
+  iconNode?: () => Node
   disabled?: boolean
+  /** Infobulle de l'entrée — pourquoi elle est désactivée, par exemple. */
+  title?: string
   action?: () => void | Promise<void>
 }
 
@@ -125,13 +140,20 @@ export class ContextMenu {
         menu.append(el('div', { class: `${NS}-menu-sep` }))
         continue
       }
+      if (item.heading !== undefined) {
+        menu.append(el('div', { class: `${NS}-menu-heading`, attrs: { role: 'presentation' }, text: item.heading }))
+        continue
+      }
+      let icone: Node = el('span', { class: `${NS}-icon` })
+      if (item.iconNode) {
+        icone = el('span', { class: `${NS}-icon ${NS}-icon-host`, children: [item.iconNode()] })
+      } else if (item.icon) {
+        icone = this.ctx.icon(item.icon)
+      }
       menu.append(el('button', {
         class: `${NS}-menu-item`,
-        attrs: { type: 'button', role: 'menuitem', disabled: item.disabled },
-        children: [
-          item.icon ? this.ctx.icon(item.icon) : el('span', { class: `${NS}-icon` }),
-          el('span', { text: item.label ?? '' }),
-        ],
+        attrs: { type: 'button', role: 'menuitem', disabled: item.disabled, title: item.title },
+        children: [icone, el('span', { text: item.label ?? '' })],
         on: {
           click: () => { this.close(); void item.action?.() },
         },

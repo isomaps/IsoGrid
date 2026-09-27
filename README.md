@@ -715,6 +715,12 @@ contextMenu: {
 
 `contextMenu: false` rend la main au menu natif du navigateur.
 
+Une entrée peut aussi être un **intertitre** (`{ heading: 'Préparation' }`),
+pour ranger un menu long par thèmes, et porter un **pictogramme fourni par
+l'hôte** (`iconNode: () => node`, prioritaire sur `icon`) quand ses icônes
+viennent de son propre jeu. `title` donne une infobulle à l'entrée — pourquoi
+elle est grisée, par exemple. Un menu plus haut que la fenêtre défile.
+
 **Au doigt**, un **appui long** (500 ms, `contextMenu.longPress`) ouvre ce même
 menu, à l'endroit touché : iOS n'émet jamais `contextmenu`, sans quoi rien de
 ce menu ne serait atteignable sur tablette. Seuls les pointeurs `touch`
