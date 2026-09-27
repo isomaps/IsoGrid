@@ -21,6 +21,8 @@ interface IconSpec {
   solid?: boolean
   /** Défaut : '0 0 16 16'. */
   viewBox?: string
+  /** Règle de remplissage `evenodd` : les contours intérieurs font des trous. */
+  evenodd?: boolean
 }
 
 /**
@@ -79,8 +81,14 @@ const PATHS: Record<IconName, string | IconSpec> = {
   'fullscreen': 'M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4',
   // Meme geometrie, coins resserres vers le centre : revenir a la taille normale.
   'fullscreen-exit': 'M6 2v4H2M10 2v4h4M10 14v-4h4M6 14v-4H2',
-  // Imprimante : bac à papier au-dessus, corps, feuille qui sort en dessous.
-  'print': 'M4.5 5.5v-3h7v3M4.5 11.5H2.5v-6h11v6h-2M4.5 9.5h7v4h-7z',
+  // Heroicons « printer » solid (MIT), comme `filter` et `columns` : c'est
+  // leur voisine dans la barre, et un tracé au trait y paraissait plus petit.
+  'print': {
+    solid: true,
+    evenodd: true,
+    viewBox: '0 0 24 24',
+    d: 'M7.875 1.5C6.839 1.5 6 2.34 6 3.375v2.99c-.426.053-.851.11-1.274.174-1.454.218-2.476 1.483-2.476 2.917v6.294a3 3 0 0 0 3 3h.27l-.155 1.705A1.875 1.875 0 0 0 7.232 22.5h9.536a1.875 1.875 0 0 0 1.867-2.045l-.155-1.705h.27a3 3 0 0 0 3-3V9.456c0-1.434-1.022-2.7-2.476-2.917A48.716 48.716 0 0 0 18 6.366V3.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM16.5 6.205v-2.83A.375.375 0 0 0 16.125 3h-8.25a.375.375 0 0 0-.375.375v2.83a49.353 49.353 0 0 1 9 0Zm-.217 8.265c.178.018.317.16.333.337l.526 5.784a.375.375 0 0 1-.374.409H7.232a.375.375 0 0 1-.374-.409l.526-5.784a.373.373 0 0 1 .333-.337 41.741 41.741 0 0 1 8.566 0Zm.967-3.97a.75.75 0 0 1 .75-.75h.008a.75.75 0 0 1 .75.75v.008a.75.75 0 0 1-.75.75H18a.75.75 0 0 1-.75-.75V10.5ZM15 9.75a.75.75 0 0 0-.75.75v.008c0 .414.336.75.75.75h.008a.75.75 0 0 0 .75-.75V10.5a.75.75 0 0 0-.75-.75H15Z',
+  },
   // Trois colonnes de trois points : la poignée de glisser universelle. Deux
   // colonnes se lisaient mal à petite taille et ne se distinguaient pas du
   // menu « ⋮ » voisin.
@@ -121,6 +129,7 @@ function svg(name: IconName): SVGSVGElement {
   path.setAttribute('d', spec.d)
   if (spec.solid) {
     path.setAttribute('fill', 'currentColor')
+    if (spec.evenodd) path.setAttribute('fill-rule', 'evenodd')
   } else {
     path.setAttribute('stroke', 'currentColor')
     path.setAttribute('stroke-linecap', 'round')
