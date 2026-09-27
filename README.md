@@ -363,6 +363,55 @@ d'être appelé en plus, pour les hôtes qui veulent faire les deux — sauf pen
 la restauration : la grille ne renvoie pas à l'hôte ce qu'il vient de lui
 donner.
 
+## Vues enregistrées
+
+L'utilisateur enregistre l'état courant de la grille sous un nom — colonnes
+(ordre, visibilité, largeurs, épinglage), tri, filtres, recherche, groupage —
+et le réapplique d'un clic depuis le menu **« Vues ▾ »** de la barre d'outils.
+La grille fournit l'interface et la mécanique ; **le stockage est à l'hôte**,
+qui décide seul de ce que « partagée », « modifiable » et « par défaut »
+veulent dire chez lui.
+
+```ts
+new IsoGrid(el, {
+  columns: [...],
+  savedViews: {
+    list: () => api.get('/vues/factures'),               // SavedView[]
+    save: (v) => api.post('/vues/factures', v),          // { id?, name, shared, state } → SavedView
+    remove: (id) => api.delete(`/vues/factures/${id}`),
+    setDefault: (id) => api.post('/vues/factures/defaut', { id }), // id | null
+    canShare: true,                    // affiche la case « partager »
+    sharedLabel: 'Pour toute mon équipe',
+  },
+  initialViewId: urlParams.get('vue') ?? undefined,     // ouvrir une vue précise
+  onViewApplied: (view) => { /* view === null : vue d'origine */ },
+})
+```
+
+Le menu propose « Vue d'origine » (l'état de départ fixé par l'hôte), les
+vues en deux sections (« Mes vues » / « Partagées »), l'étoile de la vue par
+défaut, la marque **« modifiée »** quand l'écran s'écarte de la vue active, et
+les actions Enregistrer, Enregistrer sous…, Renommer…, Supprimer (vues
+`editable` seulement), Définir par défaut / Retirer le défaut. Un échec de
+l'adaptateur s'affiche en bulle et ne touche pas à la grille.
+
+API : `getViewState()`, `applyView(state)` (tout l'état, **un seul
+rechargement** en mode serveur ; la vue active devient « aucune »),
+`selectView(id | null)` (applique une vue enregistrée et la marque active),
+`getActiveViewId()`, `getSavedViews()`, `refreshSavedViews()`.
+
+**Ordre de priorité au montage**, du plus fort au plus faible :
+
+1. `initialViewId` (s'il désigne une vue existante) ;
+2. la vue marquée `isDefault` ;
+3. l'état relu du `stateStore` ;
+4. `initialState`, puis les réglages des colonnes.
+
+La liste des vues est lue en même temps que le `stateStore`, et le premier
+chargement de données attend les deux (même garde-fou `loadTimeout`) : la
+grille se charge une fois, directement dans la bonne vue. Le `stateStore`
+continue ensuite d'enregistrer l'état affiché, vue comprise.
+
 ## Thème
 
 Tout passe par des variables CSS sur `.isg-root` :

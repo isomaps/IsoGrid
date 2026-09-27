@@ -85,6 +85,10 @@ const PATHS: Record<IconName, string | IconSpec> = {
   'grip': 'M4 4h.01M8 4h.01M12 4h.01M4 8h.01M8 8h.01M12 8h.01M4 12h.01M8 12h.01M12 12h.01',
   'spinner': 'M8 1.75a6.25 6.25 0 1 0 6.25 6.25',
   'warning': 'M8 2.5 1.75 13.5h12.5zM8 6.5v3.2M8 11.6h.01',
+  // Signet : une vue enregistrée, qu'on retrouve d'un clic.
+  'views': 'M4.5 2.5h7v11L8 10.75 4.5 13.5z',
+  // Étoile pleine : la vue par défaut.
+  'star': { solid: true, d: 'M8 1.6l1.95 3.95 4.35.63-3.15 3.07.74 4.33L8 11.53l-3.89 2.05.74-4.33L1.7 6.18l4.35-.63z' },
 }
 
 /** Icônes dont le tracé se lit comme des points plutôt que des lignes. */
@@ -159,6 +163,8 @@ const FA: Record<IconName, string> = {
   'grip': 'fa-solid fa-grip-vertical',
   'spinner': 'fa-solid fa-circle-notch fa-spin',
   'warning': 'fa-solid fa-triangle-exclamation',
+  'views': 'fa-solid fa-bookmark',
+  'star': 'fa-solid fa-star',
 }
 
 /**

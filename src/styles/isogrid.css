@@ -838,6 +838,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
      pour détacher l'en-tête sans l'alourdir d'un aplat. */
   --isg-border-header: #dcdddd;
   --isg-accent: #2563eb;
+  --isg-accent-fg: #ffffff;
   --isg-accent-soft: #dbeafe;
   --isg-danger: #dc2626;
   --isg-warning: #b45309;
@@ -859,6 +860,7 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
     --isg-border: #334155;
     --isg-border-strong: #475569;
     --isg-accent: #60a5fa;
+    --isg-accent-fg: #0f172a;
     --isg-accent-soft: #1e3a5f;
     --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
   }
@@ -898,6 +900,71 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-menu-item .isg-icon { width: 14px; text-align: center; color: var(--isg-fg-muted); font-size: 12px; }
 .isg-menu-item.isg-active .isg-icon { color: var(--isg-accent); }
 .isg-menu-sep { height: 1px; margin: 4px 2px; background: var(--isg-border); }
+
+/* ==========================================================================
+   Vues enregistrées : bouton, menu, boîte de dialogue
+   ========================================================================== */
+
+.isg-btn.isg-views-btn { max-width: 280px; }
+.isg-btn.isg-views-btn.isg-active { border-color: var(--isg-accent); color: var(--isg-accent); }
+.isg-views-btn .isg-icon { flex: none; }
+.isg-views-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-views-modified {
+  flex: none;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--isg-warning);
+}
+
+.isg-views-menu { max-height: 70vh; overflow-y: auto; }
+.isg-views-section {
+  padding: 8px 8px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--isg-fg-muted);
+}
+.isg-views-empty { padding: 4px 8px 6px; color: var(--isg-fg-muted); font-style: italic; }
+.isg-views-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isg-views-spacer { display: inline-block; width: 14px; flex: none; }
+.isg-views-star { display: inline-flex; flex: none; color: #f59e0b; font-size: 12px; }
+.isg-views-menu .isg-menu-item:disabled { opacity: .45; cursor: not-allowed; }
+
+.isg-views-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483099; /* juste sous .isg-popover */
+  background: rgb(15 23 42 / 28%);
+}
+.isg-popover.isg-views-dialog {
+  left: 50%;
+  top: 22vh;
+  transform: translateX(-50%);
+  width: min(380px, calc(100vw - 32px));
+  max-width: none;
+  padding: 10px 12px 12px;
+}
+.isg-views-form { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.isg-views-form .isg-popover-title { margin-bottom: 0; }
+.isg-views-input { width: 100%; }
+.isg-views-message { font-weight: 600; overflow-wrap: anywhere; }
+.isg-views-share { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.isg-views-share input { margin: 0; accent-color: var(--isg-accent); }
+.isg-views-error { color: var(--isg-danger); font-size: 12px; }
+.isg-views-error:empty { display: none; }
+.isg-views-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.isg-popover .isg-btn.isg-btn-primary {
+  background: var(--isg-accent);
+  border-color: var(--isg-accent);
+  color: var(--isg-accent-fg);
+}
+.isg-popover .isg-btn.isg-btn-primary.isg-btn-danger {
+  background: var(--isg-danger);
+  border-color: var(--isg-danger);
+  color: #ffffff;
+}
+.isg-popover .isg-btn.isg-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
 
 /* ==========================================================================
    Éditeur de filtre

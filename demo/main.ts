@@ -1,5 +1,6 @@
 import { IsoGrid } from '../src/index'
 import type { ColumnDef, LocaleCode } from '../src/core/types'
+import type { SavedView, SavedViewsAdapter } from '../src/core/saved-views'
 import { createFakeServer, generateInvoices, type Invoice } from './data'
 import '../src/styles/isogrid.css'
 
@@ -50,6 +51,43 @@ const STATE_KEY = 'isogrid-demo-state'
 const saved = localStorage.getItem(STATE_KEY)
 
 let grid: IsoGrid<Invoice>
+
+/*
+ * Vues enregistrées : adaptateur de démonstration sur le localStorage.
+ *
+ * Dans une vraie application, ces quatre fonctions appellent le serveur,
+ * qui décide de ce que « partagée » veut dire (équipe, profil, tout le
+ * monde) et de qui peut modifier quoi (`editable`). Ici tout reste
+ * modifiable : il n'y a qu'un utilisateur.
+ */
+const VIEWS_KEY = 'isogrid-demo-views'
+const readViews = (): SavedView[] => {
+  try { return JSON.parse(localStorage.getItem(VIEWS_KEY) ?? '[]') as SavedView[] } catch { return [] }
+}
+const writeViews = (views: SavedView[]) => {
+  try { localStorage.setItem(VIEWS_KEY, JSON.stringify(views)) } catch { /* confort seulement */ }
+}
+const demoViews: SavedViewsAdapter = {
+  canShare: true,
+  sharedLabel: 'Partager avec toute l\'équipe',
+  list: async () => readViews(),
+  save: async ({ id, name, shared, state }) => {
+    const views = readViews()
+    const existing = id ? views.find(v => v.id === id) : undefined
+    const view: SavedView = {
+      id: existing?.id ?? `v${Date.now().toString(36)}`,
+      name,
+      shared,
+      editable: true,
+      isDefault: existing?.isDefault ?? false,
+      state,
+    }
+    writeViews(existing ? views.map(v => (v.id === view.id ? view : v)) : [...views, view])
+    return view
+  },
+  remove: async (id) => writeViews(readViews().filter(v => v.id !== id)),
+  setDefault: async (id) => writeViews(readViews().map(v => ({ ...v, isDefault: v.id === id }))),
+}
 
 function build(mode: 'server' | 'client') {
   grid?.destroy()
@@ -117,6 +155,10 @@ function build(mode: 'server' | 'client') {
   },
   sidebar: { panels: ['columns', 'filters'], defaultOpen: false },
   toolbar: { quickFilter: true, quickFilterPlaceholder: 'Rechercher une facture…' },
+  savedViews: demoViews,
+  // `?view=<id>` dans l'URL ouvre une vue précise, comme un favori.
+  initialViewId: new URLSearchParams(location.search).get('view') ?? undefined,
+  onViewApplied: (view) => console.debug('[demo] vue appliquée :', view?.name ?? "vue d'origine"),
   onRowClick: (row) => console.debug('[demo] ligne', row.number),
   })
   ;(window as unknown as { grid: unknown }).grid = grid

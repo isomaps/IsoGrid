@@ -34,6 +34,10 @@ import {
   type CellEditor, createDefaultEditor, isCellEditable, parseEditedValue,
 } from '../core/editing'
 import { DEFAULTS } from '../core/defaults'
+import {
+  type SavedView, type SavedViewState, isInternalColumn, sameViewState, toSavedViewState,
+} from '../core/saved-views'
+import { SavedViewsMenu, type SavedViewsController } from './saved-views'
 
 
 export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
@@ -134,6 +138,20 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private saveAgain = false
   private stateStoreWarned = false
 
+  /* --- vues enregistrées --- */
+  /** `initialState` tel que l'hôte l'a donné, avant fusion du dépôt : base de la « vue d'origine ». */
+  private hostInitialState?: Partial<GridState>
+  private savedViewsList: SavedView[] = []
+  private savedViewsLoaded = false
+  private activeViewId: string | null = null
+  private viewsMenu?: SavedViewsMenu
+  /** > 0 pendant l'application d'une vue : les changements s'accumulent, un seul rechargement à la fin. */
+  private viewBatch = 0
+  /** Le groupage serveur a changé pendant l'application : recharger même à signature égale. */
+  private viewBatchReload = false
+  /** Vue d'origine calculée, et les colonnes pour lesquelles elle l'a été. */
+  private originCache?: { key: string; state: SavedViewState }
+
   constructor(container: HTMLElement, options: IsoGridOptions<TRow>) {
     this.options = options
     this.t = new Translator(resolveLocale(options.locale), options.messages)
@@ -148,6 +166,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // asynchrone, `attente` porte la promesse et le premier chargement de
     // données est repoussé jusqu'à son arrivée — la grille ne se dessine
     // qu'une fois, au lieu de s'afficher puis de se réafficher autrement.
+    this.hostInitialState = options.initialState
     const attente = this.loadPersistedState()
 
     const datasource = this.resolveDatasource()
@@ -230,6 +249,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     if (options.contextMenu !== false) {
       this.contextMenu = new ContextMenu(this.ctx, (options.contextMenu ?? {}) as ContextMenuOptions)
     }
+    if (options.savedViews) {
+      this.viewsMenu = new SavedViewsMenu(this.ctx, this.savedViewsController())
+    }
+    // Les vues sont demandées AVANT le premier chargement de données : s'il
+    // existe une vue par défaut, charger d'abord les lignes sans elle ferait
+    // deux requêtes et un écran qui change sous les yeux.
+    const vueDeDepart = this.loadStartupView()
     this.root = this.buildLayout(container)
 
     this.lastDataSignature = this.dataSignature()
@@ -237,7 +263,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.applyTheme(options.theme ?? 'auto')
     this.columnModel.setAvailableWidth(this.usableWidth())
     this.render()
-    if (attente) void this.awaitPersistedState(attente)
+    if (attente || vueDeDepart) void this.awaitPersistedState(attente, vueDeDepart)
     else this.refreshVisibleRange()
 
     // Un seul écouteur global, posé une fois — pas seulement quand le bouton
@@ -323,7 +349,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    * appliqué quand même.
    */
   private async awaitPersistedState(
-    attente: Promise<Partial<GridState> | null | undefined>,
+    attente: Promise<Partial<GridState> | null | undefined> | null,
+    vueDeDepart: Promise<SavedView | null> | null = null,
   ): Promise<void> {
     let demarre = false
     const demarrer = (): void => {
@@ -338,27 +365,39 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const delai = this.options.stateStore?.loadTimeout ?? DEFAULTS.stateLoadTimeout
     const garde = setTimeout(demarrer, delai)
 
-    let state: Partial<GridState> | null | undefined
-    try {
-      state = await attente
-    } catch (error) {
-      this.onStateStoreError(error, 'load')
-    }
+    // Les deux lectures partent en même temps : attendre l'une puis l'autre
+    // additionnerait leurs latences avant le premier affichage.
+    const [state, vue] = await Promise.all([
+      Promise.resolve(attente).catch((error: unknown) => {
+        this.onStateStoreError(error, 'load')
+        return null
+      }),
+      Promise.resolve(vueDeDepart),
+    ])
     clearTimeout(garde)
     if (this.destroyed) return
 
-    if (state) this.applyRestoredState(state)
-    demarrer()
-  }
-
-  /** Pose l'état relu sans le réenregistrer aussitôt : l'hôte nous l'a donné. */
-  private applyRestoredState(state: Partial<GridState>): void {
-    this.restoringState = true
-    try {
-      this.setState(state)
-    } finally {
-      this.restoringState = false
+    // Ordre d'application = ordre de priorité croissant : l'état du dépôt,
+    // puis la vue, qui l'emporte sur lui. Le tout en UN passage : chaque
+    // réglage posé séparément relançait un chargement, avec un état
+    // intermédiaire que l'utilisateur n'a jamais demandé.
+    if (state || vue) {
+      this.restoringState = true
+      this.viewBatch++
+      try {
+        if (state) this.setState(state)
+        if (vue) this.applyViewState(vue.state)
+      } finally {
+        this.viewBatch--
+        this.restoringState = false
+      }
+      // Encore en attente : `demarrer()` chargera. Délai de garde déjà
+      // écoulé : la réconciliation recharge, une fois.
+      this.restoringState = true
+      try { this.finishViewBatch() } finally { this.restoringState = false }
+      if (vue) this.setActiveView(vue, true)
     }
+    demarrer()
   }
 
   /**
@@ -461,6 +500,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         this.ctx,
         this.options.toolbar ?? {},
         (panel) => this.togglePanel(panel),
+        this.viewsMenu,
       )
       root.append(this.toolbar.element)
     }
@@ -800,8 +840,13 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         suivant !== null ? [suivant] : [],
         suivant !== null ? { width: this.options.groupColumnWidth ?? DEFAULTS.groupColumnWidth } : false,
       )
-      this.reload()
-      this.emitState()
+      if (this.viewBatch > 0) {
+        // Application d'une vue : le rechargement est fait une fois, à la fin.
+        this.viewBatchReload = true
+      } else {
+        this.reload()
+        this.emitState()
+      }
       this.options.onRowGroupChanged?.(suivant !== null ? [suivant] : [], this)
       return
     }
@@ -946,6 +991,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   private onColumnModelChange(): void {
     if (this.destroyed) return
+    // Application d'une vue en cours : tout est rejoué une fois, à la fin.
+    if (this.viewBatch > 0) return
 
     // Redimensionnement en cours : seule la géométrie bouge. On la réapplique
     // aux cellules déjà là plutôt que de tout reconstruire — reconstruire
@@ -2036,11 +2083,263 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     }
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Vues enregistrées                                                    */
+  /* ------------------------------------------------------------------ */
+
+  getViewState(): SavedViewState {
+    return toSavedViewState(this.getState())
+  }
+
+  applyView(state: SavedViewState): void {
+    this.applyViewState(state)
+    this.setActiveView(null, false)
+  }
+
+  getActiveViewId(): string | null {
+    return this.activeViewId
+  }
+
+  getSavedViews(): SavedView[] {
+    return this.savedViewsList.slice()
+  }
+
+  async refreshSavedViews(): Promise<void> {
+    const adapter = this.options.savedViews
+    if (!adapter) return
+    try {
+      this.savedViewsList = await adapter.list()
+      this.savedViewsLoaded = true
+    } catch (error) {
+      console.warn('[IsoGrid] la liste des vues n\'a pas pu être relue.', error)
+    }
+    // La vue active a pu disparaître (supprimée ailleurs) : on n'en garde pas
+    // un identifiant orphelin.
+    if (this.activeViewId !== null && !this.savedViewsList.some(v => v.id === this.activeViewId)) {
+      this.activeViewId = null
+    }
+    this.toolbar?.syncViews()
+  }
+
+  async selectView(id: string | null): Promise<boolean> {
+    if (id === null) {
+      this.applyViewState(this.originViewState())
+      this.setActiveView(null, true)
+      return true
+    }
+    if (!this.savedViewsLoaded) await this.refreshSavedViews()
+    const view = this.savedViewsList.find(v => v.id === id)
+    if (!view) return false
+    this.applyViewState(view.state)
+    this.setActiveView(view, true)
+    return true
+  }
+
+  private setActiveView(view: SavedView | null, notify: boolean): void {
+    this.activeViewId = view?.id ?? null
+    this.toolbar?.syncViews()
+    if (notify) this.options.onViewApplied?.(view)
+  }
+
+  /**
+   * Lit la liste des vues au montage et désigne celle à appliquer :
+   * `initialViewId` s'il existe, sinon la vue par défaut. Rend `null` sans
+   * adaptateur — la grille démarre alors comme avant.
+   */
+  private loadStartupView(): Promise<SavedView | null> | null {
+    const adapter = this.options.savedViews
+    if (!adapter) return null
+    this.stateLoading = true
+    return Promise.resolve()
+      .then(() => adapter.list())
+      .then((list) => {
+        this.savedViewsList = Array.isArray(list) ? list : []
+        this.savedViewsLoaded = true
+        const wanted = this.options.initialViewId
+        return (wanted != null ? this.savedViewsList.find(v => v.id === wanted) : undefined)
+          ?? this.savedViewsList.find(v => v.isDefault)
+          ?? null
+      })
+      .catch((error: unknown) => {
+        console.warn('[IsoGrid] la liste des vues n\'a pas pu être lue.', error)
+        return null
+      })
+  }
+
+  /**
+   * L'état de départ fixé par l'HÔTE : déclaration des colonnes et
+   * `initialState` d'origine, sans ce que le dépôt ni une vue y ont ajouté.
+   * Reconstruit à la demande sur un modèle jetable — les colonnes ont pu
+   * changer depuis le montage.
+   */
+  private originViewState(): SavedViewState {
+    const key = this.businessColumnIds().join('\u0000')
+    if (this.originCache?.key === key) return this.originCache.state
+    const init = this.hostInitialState ?? {}
+    const groupes = init.rowGroup ?? this.options.rowGroup ?? []
+    const modele = new ColumnModel({
+      columns: this.columnModel.getAllDefs(),
+      groupedColumnIds: groupes,
+      defaultColumnWidth: this.options.defaultColumnWidth ?? DEFAULTS.defaultColumnWidth,
+      fillWidth: this.options.fillWidth !== false,
+      initialState: init,
+      onChange: () => {},
+    })
+    const state = modele.getState()
+    modele.destroy()
+    const origin = toSavedViewState({ ...state, rowGroup: groupes })
+    this.originCache = { key, state: origin }
+    return origin
+  }
+
+  /** Les colonnes métier connues, dans l'ordre de déclaration. */
+  private businessColumnIds(): string[] {
+    return this.columnModel.getAllDefs().map(d => d.id)
+  }
+
+  /**
+   * L'état affiché s'écarte-t-il de la vue active ? Sur la vue d'origine, on
+   * compare à l'état de départ de l'hôte.
+   */
+  private isViewModified(): boolean {
+    const active = this.activeViewId === null
+      ? null
+      : this.savedViewsList.find(v => v.id === this.activeViewId)
+    const reference = active ? active.state : this.originViewState()
+    return !sameViewState(this.getViewState(), reference, this.businessColumnIds())
+  }
+
+  /**
+   * Pose TOUT l'état d'une vue, en un seul passage.
+   *
+   * Chaque réglage posé séparément (tri, puis filtres, puis recherche,
+   * puis groupage) relancerait un chargement en mode serveur : quatre
+   * requêtes pour une vue. Les changements sont donc accumulés
+   * (`viewBatch`), puis réconciliés une fois.
+   *
+   * Les colonnes que la vue ne connaît plus sont ignorées ; celles qu'elle ne
+   * connaît pas encore gardent leur réglage de déclaration. Les colonnes
+   * internes (sélection, arborescence, détail, actions) gardent leur place.
+   */
+  private applyViewState(view: SavedViewState): void {
+    const known = new Set(this.businessColumnIds())
+    const keep = (id: string) => known.has(id)
+    const pick = <T>(obj: Record<string, T> | undefined): Record<string, T> =>
+      Object.fromEntries(Object.entries(obj ?? {}).filter(([id]) => keep(id)))
+
+    const courant = this.columnModel.getState().columnPinning
+    const filters: GridState['filters'] = {}
+    for (const [id, model] of Object.entries(view.filters ?? {})) {
+      const normal = keep(id) ? normalizeFilter(model) : null
+      if (normal) filters[id] = normal
+    }
+
+    const patch: Partial<GridState> = {
+      columnOrder: (view.columnOrder ?? []).filter(keep),
+      columnVisibility: pick(view.columnVisibility),
+      columnSizing: pick(view.columnSizing),
+      columnPinning: {
+        start: [
+          ...courant.start.filter(isInternalColumn),
+          ...(view.columnPinning?.start ?? []).filter(keep),
+        ],
+        end: [
+          ...(view.columnPinning?.end ?? []).filter(keep),
+          ...courant.end.filter(isInternalColumn),
+        ],
+      },
+      sort: (view.sort ?? []).filter(s => keep(s.id)).map(s => ({ id: s.id, desc: !!s.desc })),
+      filters,
+      quickFilter: view.quickFilter ?? '',
+    }
+
+    const groupes = (view.rowGroup ?? []).filter(keep)
+    const courants = this.getRowGroup()
+    const groupageChange = groupes.length !== courants.length || groupes.some((id, i) => id !== courants[i])
+
+    this.viewBatch++
+    try {
+      this.columnModel.setState(patch)
+      if (groupageChange && (groupes.length === 0 || this.canRowGroup())) this.applyRowGroup(groupes)
+    } finally {
+      this.viewBatch--
+    }
+    // Imbriqué dans un passage plus large (montage) : c'est lui qui réconcilie.
+    if (this.viewBatch === 0) this.finishViewBatch()
+  }
+
+  /** Réconcilie après `applyViewState` : un rechargement au plus, un état émis. */
+  private finishViewBatch(): void {
+    const groupageServeur = this.viewBatchReload
+    this.viewBatchReload = false
+
+    const filterSignature = this.filterSignature()
+    const filtresChanges = filterSignature !== this.lastFilterSignature
+    if (filtresChanges) {
+      this.lastFilterSignature = filterSignature
+      this.selection.clear()
+      this.lastSelectedIndex = null
+    }
+    const signature = this.dataSignature()
+    const donneesChangees = signature !== this.lastDataSignature
+    this.lastDataSignature = signature
+
+    // Données pas encore demandées (montage) : le démarrage chargera, avec
+    // le bon état, une seule fois.
+    if (this.stateLoading) this.render()
+    else if (donneesChangees || groupageServeur) {
+      this.reload({ gardeSections: !filtresChanges && !groupageServeur })
+    } else this.render()
+    this.emitState()
+  }
+
+  private savedViewsController(): SavedViewsController {
+    const adapter = this.options.savedViews!
+    return {
+      adapter,
+      views: () => this.savedViewsList,
+      loaded: () => this.savedViewsLoaded,
+      refresh: () => this.refreshSavedViews(),
+      activeId: () => this.activeViewId,
+      isModified: () => this.isViewModified(),
+      select: (id) => this.selectView(id),
+      save: async (input, captureState) => {
+        const existante = input.id ? this.savedViewsList.find(v => v.id === input.id) : undefined
+        const state = captureState || !existante ? this.getViewState() : existante.state
+        const saved = await adapter.save({ ...input, state })
+        const at = this.savedViewsList.findIndex(v => v.id === saved.id)
+        if (at >= 0) this.savedViewsList.splice(at, 1, saved)
+        else this.savedViewsList.push(saved)
+        // Enregistrer l'écran courant en fait la vue active. Renommer ne
+        // change pas ce qui est affiché : la vue active reste la même.
+        if (captureState) this.setActiveView(saved, false)
+        else this.toolbar?.syncViews()
+        return saved
+      },
+      remove: async (id) => {
+        await adapter.remove(id)
+        this.savedViewsList = this.savedViewsList.filter(v => v.id !== id)
+        // L'écran ne change pas : on reste sur ce qui est affiché, qui n'est
+        // plus rattaché à aucune vue.
+        if (this.activeViewId === id) this.setActiveView(null, false)
+        else this.toolbar?.syncViews()
+      },
+      setDefault: async (id) => {
+        await adapter.setDefault(id)
+        this.savedViewsList = this.savedViewsList.map(v => ({ ...v, isDefault: v.id === id }))
+        this.toolbar?.syncViews()
+      },
+    }
+  }
+
   resetState(): void {
     this.columnModel.setColumns(this.options.columns as ColumnDef[])
   }
 
   private emitState(): void {
+    if (this.viewBatch > 0) return
+    // La marque « modifiée » suit chaque changement, restauration comprise.
+    this.toolbar?.syncViews()
     // Pendant la restauration, l'état vient de l'hôte : le lui renvoyer ferait
     // un aller-retour inutile, et un enregistrement pour rien.
     if (this.restoringState) return
@@ -2595,6 +2894,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   destroy(): void {
+    this.viewsMenu?.close()
     // Le dernier geste de l'utilisateur — une colonne déplacée juste avant de
     // quitter la page — serait perdu dans le délai de regroupement.
     this.saveStateSoon?.cancel()

@@ -739,6 +739,35 @@ export interface IsoGridOptions<TRow = AnyRow> {
   stateStore?: import('./state-store').GridStateStore
 
   /**
+   * Vues enregistrées : l'utilisateur nomme l'état courant de la grille
+   * (colonnes, tri, filtres, recherche, groupage) et le réapplique d'un clic.
+   *
+   * La grille fournit le menu « Vues » de la barre d'outils et la mécanique ;
+   * l'hôte fournit le stockage — et décide seul de ce que « partagée »,
+   * « modifiable » et « par défaut » veulent dire chez lui.
+   *
+   * Absent : aucun bouton, aucun changement de comportement.
+   *
+   * Au montage, la vue marquée `isDefault` est appliquée, sauf si
+   * `initialViewId` en désigne une autre. Priorité, de la plus forte à la plus
+   * faible : `initialViewId` > vue par défaut > `stateStore` > `initialState`.
+   */
+  savedViews?: import('./saved-views').SavedViewsAdapter
+
+  /**
+   * Vue à ouvrir au montage, par identifiant — un lien ou un favori qui mène
+   * à une vue précise. L'emporte sur la vue par défaut ; si elle n'existe pas
+   * (supprimée, plus partagée), la vue par défaut s'applique.
+   */
+  initialViewId?: string
+
+  /**
+   * Une vue vient d'être appliquée depuis le menu, au montage, ou par
+   * `selectView()`. `null` : retour à la vue d'origine.
+   */
+  onViewApplied?: (view: import('./saved-views').SavedView | null) => void
+
+  /**
    * Classes CSS supplémentaires à poser sur une ligne, d'après son contenu.
    *
    * Une grille montre des données ; l'hôte, lui, sait ce qu'elles signifient —
@@ -805,6 +834,7 @@ export type IconName =
   | 'check' | 'chevron-down' | 'chevron-right'
   | 'eye' | 'eye-off' | 'grip' | 'spinner' | 'warning'
   | 'fullscreen' | 'fullscreen-exit'
+  | 'views' | 'star'
 
 /* ------------------------------------------------------------------------ */
 /* API publique de l'instance                                                */
@@ -906,6 +936,28 @@ export interface IsoGridApi<TRow = AnyRow> {
   setLocale(locale: LocaleCode): void
   setTheme(theme: ThemeMode): void
   sizeColumnsToFit(): void
+
+  /* --- vues enregistrées --- */
+  /** État courant, réduit à ce qu'une vue retient. */
+  getViewState(): import('./saved-views').SavedViewState
+  /**
+   * Applique TOUT l'état d'une vue — ordre, visibilité, largeurs, épinglage,
+   * tri, filtres, recherche, groupage — en un seul rechargement en mode
+   * serveur. La vue active devient « aucune » : pour appliquer une vue
+   * enregistrée en la marquant active, `selectView(id)`.
+   */
+  applyView(state: import('./saved-views').SavedViewState): void
+  /** Vue enregistrée active, `null` sur la vue d'origine ou un état libre. */
+  getActiveViewId(): string | null
+  /**
+   * Applique une vue enregistrée par identifiant et la marque active ;
+   * `null` revient à la vue d'origine. Rend `false` si la vue est inconnue.
+   */
+  selectView(id: string | null): Promise<boolean>
+  /** Vues connues, telles que rendues par le dernier `list()`. */
+  getSavedViews(): import('./saved-views').SavedView[]
+  /** Relit la liste auprès de l'adaptateur (après un changement fait ailleurs). */
+  refreshSavedViews(): Promise<void>
 
   /* --- plein écran --- */
   isFullscreen(): boolean

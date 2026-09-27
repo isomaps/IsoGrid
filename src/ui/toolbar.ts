@@ -1,6 +1,7 @@
 import type { ColumnFilterModel, ToolbarTag, ToolbarOptions } from '../core/types'
 import type { GridContext } from './context'
 import { NS, debounce, el, onDismiss, positionFloating } from './dom'
+import type { SavedViewsMenu } from './saved-views'
 
 /**
  * Barre d'outils.
@@ -21,6 +22,8 @@ export class Toolbar {
     private ctx: GridContext,
     private options: ToolbarOptions,
     private onOpenPanel: (panel: 'columns' | 'filters') => void,
+    /** Menu « Vues », présent seulement si l'hôte fournit `savedViews`. */
+    private views?: SavedViewsMenu,
   ) {
     this.element = el('div', { class: `${NS}-toolbar` })
     this.render()
@@ -40,6 +43,10 @@ export class Toolbar {
     }
 
     this.right = el('div', { class: `${NS}-toolbar-right` })
+
+    // En tête du groupe de droite : une vue fixe tout ce que les boutons
+    // suivants règlent un à un (recherche, filtres, colonnes).
+    if (this.views) this.right.append(this.views.buildButton())
 
     if (this.options.quickFilter !== false) {
       const debounced = debounce((value: string) => {
@@ -153,6 +160,11 @@ export class Toolbar {
     const label = t.t(isFs ? 'exitFullscreen' : 'fullscreen')
     btn.setAttribute('title', label)
     btn.setAttribute('aria-label', label)
+  }
+
+  /** Libellé du menu « Vues » : vue active, marque « modifiée ». */
+  syncViews(): void {
+    this.views?.sync()
   }
 
   /** Remet la valeur affichée en phase avec l'état (restauration, `setState`). */
