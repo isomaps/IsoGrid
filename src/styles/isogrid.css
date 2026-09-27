@@ -211,9 +211,17 @@ svg.isg-icon { font-size: 1.05em; }
 .isg-quick-filter::-webkit-search-cancel-button { cursor: pointer; }
 
 /* Entrées de panneau : pictogramme seul, comme le filtre et le sélecteur de
-   colonnes de Filament. */
+   colonnes de Filament. Imprimer et plein écran, leurs voisins dans la barre,
+   prennent la même taille — au format générique de `.isg-icon-btn` (20 px,
+   pictogramme de 11 px), ils paraissaient rapetissés à côté. */
 /* Sélecteurs composés VOLONTAIREMENT : `.isg-icon-btn` et `.isg-input` sont
    déclarés plus bas dans ce fichier ; à spécificité égale, ils gagneraient. */
+.isg-icon-btn.isg-print-btn,
+.isg-icon-btn.isg-fullscreen-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 17px;
+}
 .isg-icon-btn.isg-panel-btn {
   position: relative;
   width: 30px;
