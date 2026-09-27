@@ -744,6 +744,12 @@ export interface IsoGridOptions<TRow = AnyRow> {
   export?: ExportOptions
   /** Réglages de l'impression. Voir `api.print()`. */
   print?: PrintOptions
+  /**
+   * Bulle d'aide au survol (et au focus clavier) des boutons à icône seule
+   * — ceux de la grille comme ceux que l'hôte pose dans ses cellules — à la
+   * place du `title` natif, lent et muet au clavier. Défaut : true.
+   */
+  tooltips?: boolean
 
   /** Bandes alternées sur les lignes. Défaut : true. */
   stripedRows?: boolean

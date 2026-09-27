@@ -722,6 +722,16 @@ l'arment ; un glissement de plus de 10 px (le défilement) l'annule, et le clic
 qui suit le lever du doigt est avalé — il sélectionnerait la ligne. La bulle
 native d'iOS est neutralisée sur les cellules. `longPress: false` le désactive.
 
+## Bulles d'aide
+
+Chaque bouton à icône seule — barre d'outils, en-têtes, ⋮ de ligne, et les
+boutons que l'hôte pose dans ses cellules — affiche une **bulle au-dessus de
+l'icône** au survol (350 ms, puis immédiatement d'une icône à l'autre) et au
+focus clavier, en dessous si la place manque. Le texte est celui du `title`
+(ou `data-isg-tip`) ; le `title` est retiré au premier survol pour que la
+bulle native ne double pas la nôtre, et `aria-label` posé s'il manquait.
+Rien au doigt. `tooltips: false` rend la main au `title` natif.
+
 ## Icônes
 
 Le jeu d'icônes est **embarqué en SVG** : aucune police externe à charger, la

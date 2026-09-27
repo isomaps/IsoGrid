@@ -1145,6 +1145,40 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-context-menu .isg-menu-item:hover .isg-icon { color: var(--isg-fg); }
 .isg-context-menu .isg-menu-item:disabled { opacity: .45; cursor: not-allowed; }
 
+/* Bulle d'aide des boutons à icône (voir ui/tooltip.ts). Mêmes couleurs que
+   le toast : sombre sur clair comme sur sombre, lisible partout. */
+.isg-tooltip {
+  position: fixed;
+  z-index: 2147483300; /* littéral : élément téléporté hors de .isg-root */
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #f8fafc;
+  font: 500 12px/1.35 var(--isg-font, system-ui, sans-serif);
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 6px 18px -6px rgb(15 23 42 / 45%);
+  animation: isg-tooltip-in .12s ease-out;
+}
+.isg-tooltip::after {
+  content: '';
+  position: absolute;
+  left: var(--isg-tip-x, 50%);
+  top: 100%;
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top-color: #0f172a;
+}
+.isg-tooltip.isg-tooltip-below::after {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: #0f172a;
+}
+@keyframes isg-tooltip-in { from { opacity: 0 } to { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .isg-tooltip { animation: none; } }
+
 .isg-toast {
   position: fixed;
   left: 50%;

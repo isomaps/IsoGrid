@@ -25,6 +25,7 @@ import type { GridContext } from './context'
 import { HeaderRenderer } from './header'
 import { FooterRenderer } from './footer'
 import { ToastHost, type ToastOptions } from './toast'
+import { Tooltips } from './tooltip'
 import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
 import { GroupPanel } from './group-panel'
@@ -96,6 +97,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private sidebar?: Sidebar
   private groupPanel?: GroupPanel
   private contextMenu?: ContextMenu
+  private tooltips?: Tooltips
   /** Menu des actions de ligne — instance dédiée, pour ne pas fermer le menu contextuel. */
   private rowActionsMenu!: ContextMenu
   /** Horodatage du dernier appui long : voir l'écoute de `contextmenu`. */
@@ -260,6 +262,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // deux requêtes et un écran qui change sous les yeux.
     const vueDeDepart = this.loadStartupView()
     this.root = this.buildLayout(container)
+    if (options.tooltips !== false) this.tooltips = new Tooltips(this.root, () => this.ctx.portal())
 
     this.lastDataSignature = this.dataSignature()
     this.lastFilterSignature = this.filterSignature()
@@ -2981,6 +2984,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.contextMenu?.close()
     this.rowActionsMenu?.close()
     this.toastHost?.destroy()
+    this.tooltips?.destroy()
     this.detailObserver?.disconnect()
     this.resizeObserver?.disconnect()
     this.themeMediaQuery?.removeEventListener('change', this.onSystemTheme)
