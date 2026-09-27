@@ -688,8 +688,16 @@ export interface IsoGridOptions<TRow = AnyRow> {
   rowActions?: {
     /** Largeur de la colonne. Défaut : 48. */
     width?: number
-    /** Construit le menu pour une ligne. Retourner `[]` masque le bouton. */
-    items: (row: TRow, rowIndex: number) => ContextMenuItem[]
+    /**
+     * Construit le menu pour une ligne. Retourner `[]` masque le bouton.
+     *
+     * `defaults` porte les entrées du menu contextuel qui valent pour une
+     * ligne entière — copier la ligne, avec ou sans en-têtes, exporter —,
+     * selon les mêmes réglages `contextMenu.copyItems` / `exportItems` ; vide
+     * si `contextMenu: false`. Les reprendre fait du « ⋮ » le MÊME menu que le
+     * clic droit, et c'est le seul qu'on atteigne au doigt sans appui long.
+     */
+    items: (row: TRow, rowIndex: number, defaults: ContextMenuItem[]) => ContextMenuItem[]
   }
 
   sidebar?: false | SidebarOptions
@@ -835,6 +843,7 @@ export type IconName =
   | 'eye' | 'eye-off' | 'grip' | 'spinner' | 'warning'
   | 'fullscreen' | 'fullscreen-exit'
   | 'views' | 'star'
+  | 'edit' | 'external-link' | 'link' | 'document' | 'plus'
 
 /* ------------------------------------------------------------------------ */
 /* API publique de l'instance                                                */

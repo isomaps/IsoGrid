@@ -28,7 +28,7 @@ import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
 import { GroupPanel } from './group-panel'
 import { ContextMenu, type ContextMenuOptions } from './context-menu'
-import { NS, debounce, el, getPath, renderIcon, setPath } from './dom'
+import { NS, debounce, el, getPath, onLongPress, renderIcon, setPath } from './dom'
 import { isPromiseLike } from '../core/state-store'
 import {
   type CellEditor, createDefaultEditor, isCellEditable, parseEditedValue,
@@ -97,6 +97,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private contextMenu?: ContextMenu
   /** Menu des actions de ligne — instance dédiée, pour ne pas fermer le menu contextuel. */
   private rowActionsMenu!: ContextMenu
+  /** Horodatage du dernier appui long : voir l'écoute de `contextmenu`. */
+  private dernierAppuiLong = 0
 
   /* --- état de rendu --- */
   private renderedRows = new Map<number, HTMLElement>()
@@ -1544,7 +1546,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     if (column.id === ROW_ACTIONS_COLUMN_ID) {
       if (row) {
-        const items = this.options.rowActions!.items(row, rowIndex)
+        const defaults = this.contextMenu ? this.contextMenu.rowDefaults(row) : []
+        const items = this.options.rowActions!.items(row, rowIndex, defaults)
         // Aucune action possible sur cette ligne : pas de bouton mort.
         if (items.length > 0) cell.append(this.buildRowActionsButton(items))
       }
@@ -1604,13 +1607,25 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     // seul niveau où l'on sait quelle colonne est visée, donc quelle valeur
     // « copier la cellule » doit prendre.
     if (this.contextMenu) {
-      cell.addEventListener('contextmenu', (e: MouseEvent) => {
-        this.contextMenu!.open(e, {
-          row, rowIndex, column: def as ColumnDef,
-          value,
-          formattedValue: def.cellRenderer ? (cell.textContent ?? '') : this.formatValue(def, ctx),
-        })
+      const menuContext = () => ({
+        row, rowIndex, column: def as ColumnDef,
+        value,
+        formattedValue: def.cellRenderer ? (cell.textContent ?? '') : this.formatValue(def, ctx),
       })
+      cell.addEventListener('contextmenu', (e: MouseEvent) => {
+        /* Android émet aussi `contextmenu` au bout d'un appui long : le menu
+           est déjà ouvert par le geste, on se contente d'écarter le natif. */
+        if (Date.now() - this.dernierAppuiLong < 1000) { e.preventDefault(); return }
+        this.contextMenu!.open(e, menuContext())
+      })
+      const delai = this.contextMenu.longPressDelay()
+      if (delai !== null) {
+        cell.classList.add(`${NS}-longpress`)
+        onLongPress(cell, delai, (x, y) => {
+          this.dernierAppuiLong = Date.now()
+          this.contextMenu!.openAt(menuContext(), x, y)
+        })
+      }
     }
     return cell
   }

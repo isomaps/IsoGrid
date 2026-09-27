@@ -1398,6 +1398,15 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-row:hover .isg-row-actions-btn,
 .isg-row-actions-btn:focus-visible { opacity: 1; }
 
+/* Appui long = menu contextuel au doigt (voir onLongPress). La bulle native
+   d'iOS — loupe, « Copier », aperçu de lien — viendrait sinon par-dessus. On
+   ne retire la sélection de texte qu'aux écrans sans souris : ailleurs, elle
+   sert à copier un bout de cellule. */
+.isg-longpress { -webkit-touch-callout: none; }
+@media (hover: none) and (pointer: coarse) {
+  .isg-longpress { -webkit-user-select: none; user-select: none; }
+}
+
 /* --- Édition de cellule ------------------------------------------------ */
 
 /* Repère discret : la cellule est modifiable, sans surcharger un tableau

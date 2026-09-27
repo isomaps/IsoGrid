@@ -474,6 +474,19 @@ Sans cela, une grille n'est qu'une consultation — c'est ce qui manque pour
 remplacer une table d'administration, où chaque ligne s'ouvre, se modifie ou
 déclenche un traitement.
 
+`items` reçoit en troisième argument les entrées du menu contextuel qui valent
+pour une ligne entière (copier la ligne, avec ou sans en-têtes, exporter). Pour
+que le « ⋮ » et le clic droit proposent **le même menu** — c'est le cas utile
+sur tablette, où le « ⋮ » est la porte d'entrée évidente :
+
+```ts
+const actions = (row, cellule) => [/* … vos entrées … */]
+new IsoGrid(el, {
+  rowActions:  { items: (row, i, defaults) => [...actions(row, null), { separator: true }, ...defaults] },
+  contextMenu: { items: (ctx, defaults) => [...actions(ctx.row, ctx), { separator: true }, ...defaults] },
+})
+```
+
 ## Lignes de détail (master-detail)
 
 ```ts
@@ -672,6 +685,13 @@ contextMenu: {
 ```
 
 `contextMenu: false` rend la main au menu natif du navigateur.
+
+**Au doigt**, un **appui long** (500 ms, `contextMenu.longPress`) ouvre ce même
+menu, à l'endroit touché : iOS n'émet jamais `contextmenu`, sans quoi rien de
+ce menu ne serait atteignable sur tablette. Seuls les pointeurs `touch`
+l'arment ; un glissement de plus de 10 px (le défilement) l'annule, et le clic
+qui suit le lever du doigt est avalé — il sélectionnerait la ligne. La bulle
+native d'iOS est neutralisée sur les cellules. `longPress: false` le désactive.
 
 ## Icônes
 

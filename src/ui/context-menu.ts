@@ -39,6 +39,16 @@ export interface ContextMenuOptions<TRow = AnyRow> {
    * les réordonner ou d'en insérer plutôt que de tout réécrire.
    */
   items?: (ctx: ContextMenuContext<TRow>, defaults: ContextMenuItem[]) => ContextMenuItem[]
+  /**
+   * Appui long au doigt (ms) qui ouvre ce même menu. Défaut : 500.
+   * `false` le désactive.
+   *
+   * Sur écran tactile il n'y a pas de clic droit : iOS n'émet jamais
+   * `contextmenu`, Android seulement parfois. Sans ce geste, tout ce que porte
+   * le menu serait hors d'atteinte au doigt. Seuls les pointeurs `touch`
+   * l'arment : la souris et le stylet gardent leur clic droit.
+   */
+  longPress?: number | false
 }
 
 /**
@@ -135,30 +145,77 @@ export class ContextMenu {
 
   open(event: MouseEvent, menuContext: ContextMenuContext): void {
     this.close()
-    const t = this.ctx.t
+    const items = this.itemsFor(menuContext)
+    if (items.length === 0) return
 
-    const visibleColumns = this.ctx.columns.getRenderColumns().map(c => c.def)
-    const rowValues = visibleColumns.map(col => this.formatFor(col, menuContext.row))
-    const headers = visibleColumns.map(col => t.header(col.header ?? col.id))
+    // On ne supprime le menu natif que si l'on a quelque chose à proposer.
+    event.preventDefault()
+    this.openItems(items, event.clientX, event.clientY)
+  }
+
+  /**
+   * Même menu qu'au clic droit, ouvert à une position donnée : c'est la
+   * porte de l'appui long, qui n'a pas d'événement `contextmenu` à annuler.
+   */
+  openAt(menuContext: ContextMenuContext, x: number, y: number): void {
+    this.close()
+    this.openItems(this.itemsFor(menuContext), x, y)
+  }
+
+  /** Délai de l'appui long, ou `null` s'il est désactivé. */
+  longPressDelay(): number | null {
+    const v = this.options.longPress
+    if (v === false) return null
+    return typeof v === 'number' && v > 0 ? v : 500
+  }
+
+  /**
+   * Entrées par défaut qui valent pour une LIGNE, sans cellule visée :
+   * copier la ligne (avec ou sans en-têtes), exporter.
+   *
+   * C'est ce que reçoit la colonne d'actions (`rowActions.items`) : le bouton
+   * « ⋮ » n'est posé sur aucune cellule, « copier la cellule » n'y a donc pas
+   * de sens — tout le reste, si. Les valeurs sont lues au moment du clic, pas
+   * à la construction : la colonne d'actions demande ses entrées à chaque
+   * rendu de ligne, et formater toute la ligne pour un menu qu'on n'ouvrira
+   * pas serait du travail perdu.
+   */
+  rowDefaults(row: AnyRow): ContextMenuItem[] {
+    return this.defaults(row, null)
+  }
+
+  private itemsFor(menuContext: ContextMenuContext): ContextMenuItem[] {
+    const defaults = this.defaults(menuContext.row, menuContext)
+    return this.options.items ? this.options.items(menuContext, defaults) : defaults
+  }
+
+  private defaults(row: AnyRow, cellule: ContextMenuContext | null): ContextMenuItem[] {
+    const t = this.ctx.t
+    const rowValues = () => this.ctx.columns.getRenderColumns()
+      .map(c => this.formatFor(c.def, row))
+    const headers = () => this.ctx.columns.getRenderColumns()
+      .map(c => t.header(c.def.header ?? c.def.id))
 
     const defaults: ContextMenuItem[] = []
 
     if (this.options.copyItems !== false) {
-      defaults.push(
-        {
+      if (cellule) {
+        defaults.push({
           label: t.t('copyCell'),
           icon: 'copy',
-          action: () => this.copy(menuContext.formattedValue),
-        },
+          action: () => this.copy(cellule.formattedValue),
+        })
+      }
+      defaults.push(
         {
           label: t.t('copyRow'),
           icon: 'copy-row',
-          action: () => this.copy(toTsv(rowValues)),
+          action: () => this.copy(toTsv(rowValues())),
         },
         {
           label: t.t('copyRowWithHeaders'),
           icon: 'copy-table',
-          action: () => this.copy(`${toTsv(headers)}\n${toTsv(rowValues)}`),
+          action: () => this.copy(`${toTsv(headers())}\n${toTsv(rowValues())}`),
         },
       )
     }
@@ -170,13 +227,7 @@ export class ContextMenu {
         { label: t.t('exportCsv'), icon: 'csv', action: () => this.ctx.api.exportCsv() },
       )
     }
-
-    const items = this.options.items ? this.options.items(menuContext, defaults) : defaults
-    if (items.length === 0) return
-
-    // On ne supprime le menu natif que si l'on a quelque chose à proposer.
-    event.preventDefault()
-    this.openItems(items, event.clientX, event.clientY)
+    return defaults
   }
 
   /** Ancre le menu au curseur, en le rabattant s'il déborde de la fenêtre. */

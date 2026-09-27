@@ -89,6 +89,14 @@ const PATHS: Record<IconName, string | IconSpec> = {
   'views': 'M4.5 2.5h7v11L8 10.75 4.5 13.5z',
   // Étoile pleine : la vue par défaut.
   'star': { solid: true, d: 'M8 1.6l1.95 3.95 4.35.63-3.15 3.07.74 4.33L8 11.53l-3.89 2.05.74-4.33L1.7 6.18l4.35-.63z' },
+  // Entrées de menu d'actions courantes : ouvrir, ouvrir ailleurs, lier,
+  // pièce jointe, ajouter. Sans elles, un hôte qui remplit `rowActions` n'a
+  // que des pictogrammes de grille à détourner.
+  'edit': 'M10.5 2.5l3 3L6 13H3v-3z',
+  'external-link': 'M9 2.5h4.5V7M13.5 2.5 7.5 8.5M11.5 9.5V13a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5h3.5',
+  'link': 'M6.5 9.5l3-3M7 4.5l1.2-1.2a2.47 2.47 0 0 1 3.5 3.5L10.5 8M9 11.5l-1.2 1.2a2.47 2.47 0 0 1-3.5-3.5L5.5 8',
+  'document': 'M9 1.75H4.25a.75.75 0 0 0-.75.75v11c0 .41.34.75.75.75h7.5a.75.75 0 0 0 .75-.75V5.25zM9 1.75v3.5h3.5',
+  'plus': 'M8 3v10M3 8h10',
 }
 
 /** Icônes dont le tracé se lit comme des points plutôt que des lignes. */
@@ -134,6 +142,11 @@ export function builtinIconRenderer(name: IconName): Node {
 
 const FA: Record<IconName, string> = {
   'sort-asc': 'fa-solid fa-arrow-up-short-wide',
+  'edit': 'fa-solid fa-pen',
+  'external-link': 'fa-solid fa-up-right-from-square',
+  'link': 'fa-solid fa-link',
+  'document': 'fa-regular fa-file',
+  'plus': 'fa-solid fa-plus',
   'sort-desc': 'fa-solid fa-arrow-down-wide-short',
   'sort-none': 'fa-solid fa-sort',
   'filter': 'fa-solid fa-filter',

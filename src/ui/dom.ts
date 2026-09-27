@@ -185,3 +185,73 @@ export function positionFloating(anchor: HTMLElement, floating: HTMLElement, gap
   floating.style.top = `${Math.round(top)}px`
   floating.style.visibility = ''
 }
+
+/**
+ * Appui long au doigt : `fire(x, y)` après `delay` ms sans lever ni glisser.
+ *
+ * Réservé aux pointeurs `touch` : à la souris, le clic droit fait déjà ce
+ * travail, et un bouton gauche maintenu sert à sélectionner du texte.
+ *
+ * Trois pièges, chacun déjà rencontré ailleurs :
+ * - le doigt qui fait défiler la grille : le navigateur émet
+ *   `pointercancel` dès qu'il prend la main, et un déplacement de plus de
+ *   10 px annule aussi — sinon chaque défilement lent ouvrirait le menu ;
+ * - le `click` qui suit le lever du doigt : il sélectionnerait la ligne, ou
+ *   pire, tomberait sur l'entrée du menu qui vient de s'ouvrir sous le
+ *   doigt. On l'avale une fois, en capture, au niveau du document ;
+ * - la bulle native (loupe, « copier ») : neutralisée par la classe posée
+ *   sur la cellule (`-webkit-touch-callout`), voir la feuille de style.
+ */
+export function onLongPress(
+  target: HTMLElement,
+  delay: number,
+  fire: (x: number, y: number) => void,
+): void {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let x0 = 0
+  let y0 = 0
+  const cancel = () => {
+    if (timer !== undefined) { clearTimeout(timer); timer = undefined }
+  }
+  target.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' || !e.isPrimary) return
+    cancel()
+    x0 = e.clientX
+    y0 = e.clientY
+    timer = setTimeout(() => {
+      timer = undefined
+      swallowNextClick()
+      fire(x0, y0)
+    }, delay)
+  })
+  target.addEventListener('pointermove', (e: PointerEvent) => {
+    if (timer !== undefined && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) cancel()
+  })
+  target.addEventListener('pointerup', cancel)
+  target.addEventListener('pointercancel', cancel)
+}
+
+/**
+ * Avale le `click` qui conclut l'appui long, et lui seul.
+ *
+ * Tous les navigateurs n'en émettent pas après un appui long : on cesse donc
+ * d'avaler au premier `pointerdown` suivant — un nouveau geste commence, et
+ * son clic (sur une entrée du menu, typiquement) doit passer — ou au bout
+ * d'une seconde.
+ */
+function swallowNextClick(): void {
+  let garde: ReturnType<typeof setTimeout> | undefined
+  const avaler = (e: Event) => {
+    e.preventDefault()
+    e.stopPropagation()
+    retirer()
+  }
+  const retirer = () => {
+    document.removeEventListener('click', avaler, true)
+    document.removeEventListener('pointerdown', retirer, true)
+    if (garde !== undefined) clearTimeout(garde)
+  }
+  document.addEventListener('click', avaler, true)
+  document.addEventListener('pointerdown', retirer, true)
+  garde = setTimeout(retirer, 1000)
+}
