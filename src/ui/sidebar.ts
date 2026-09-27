@@ -104,7 +104,8 @@ export class Sidebar {
 
   private renderColumnsPanel(): void {
     const t = this.ctx.t
-    const defs = this.ctx.columns.getOrderedDefs()
+    /* Masquées comprises : c'est ici qu'on les réaffiche. */
+    const defs = this.ctx.columns.getPanelDefs()
     const state = this.ctx.columns.getState()
 
     this.body.append(el('div', {

@@ -470,6 +470,25 @@ export class ColumnModel {
     return this.orderedDefs.map(d => this.mergedDef(d))
   }
 
+  /**
+   * Défs pour le panneau « Colonnes » : TOUTES les colonnes, masquées
+   * comprises, dans l'ordre courant (épinglées start, ordre choisi, épinglées
+   * end). getOrderedDefs() ne rend que les visibles : une colonne masquée
+   * disparaissait du panneau, et ne pouvait plus jamais être réaffichée.
+   */
+  getPanelDefs(): ColumnDef[] {
+    const all = this.getAllDefs()
+    const byId = new Map(all.map(d => [d.id, d] as [string, ColumnDef]))
+    const state = this.getState()
+    const known = (ids: readonly string[] | undefined): string[] => (ids ?? []).filter(id => byId.has(id))
+    const order = known(state.columnOrder)
+    const ids = order.concat(all.map(d => d.id).filter(id => !order.includes(id)))
+    const start = known(state.columnPinning?.start)
+    const end = known(state.columnPinning?.end)
+    const middle = ids.filter(id => !start.includes(id) && !end.includes(id))
+    return start.concat(middle, end).map(id => byId.get(id)!)
+  }
+
   /** Défs dans l'ordre d'affichage courant (ordre + épinglage appliqués). */
   getOrderedDefs(): ColumnDef[] {
     return this.getRenderColumns().map(c => c.def)
