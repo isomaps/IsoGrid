@@ -154,7 +154,8 @@ function build(mode: 'server' | 'client') {
     }
   },
   sidebar: { panels: ['columns', 'filters'], defaultOpen: false },
-  toolbar: { quickFilter: true, quickFilterPlaceholder: 'Rechercher une facture…' },
+  toolbar: { quickFilter: true, quickFilterPlaceholder: 'Rechercher une facture…', printButton: true, fullscreenButton: true },
+  print: { title: 'Factures' },
   savedViews: demoViews,
   // `?view=<id>` dans l'URL ouvre une vue précise, comme un favori.
   initialViewId: new URLSearchParams(location.search).get('view') ?? undefined,

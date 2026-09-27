@@ -79,6 +79,8 @@ const PATHS: Record<IconName, string | IconSpec> = {
   'fullscreen': 'M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4',
   // Meme geometrie, coins resserres vers le centre : revenir a la taille normale.
   'fullscreen-exit': 'M6 2v4H2M10 2v4h4M10 14v-4h4M6 14v-4H2',
+  // Imprimante : bac à papier au-dessus, corps, feuille qui sort en dessous.
+  'print': 'M4.5 5.5v-3h7v3M4.5 11.5H2.5v-6h11v6h-2M4.5 9.5h7v4h-7z',
   // Trois colonnes de trois points : la poignée de glisser universelle. Deux
   // colonnes se lisaient mal à petite taille et ne se distinguaient pas du
   // menu « ⋮ » voisin.
@@ -173,6 +175,7 @@ const FA: Record<IconName, string> = {
   'eye-off': 'fa-solid fa-eye-slash',
   'fullscreen': 'fa-solid fa-expand',
   'fullscreen-exit': 'fa-solid fa-compress',
+  'print': 'fa-solid fa-print',
   'grip': 'fa-solid fa-grip-vertical',
   'spinner': 'fa-solid fa-circle-notch fa-spin',
   'warning': 'fa-solid fa-triangle-exclamation',

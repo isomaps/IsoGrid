@@ -58,6 +58,6 @@ export type {
   ColumnFilterModel, ColumnType, DataRequest, DataResponse, Datasource,
   DateOperator, ExportOptions, ExportProgress, FilterCondition, FilterOperator,
   FilterType, GridState, IconName, IsoGridApi, IsoGridOptions, LocaleCode,
-  NumberOperator, PinPosition, SetFilterOption, SetOperator, SidebarOptions,
+  NumberOperator, PinPosition, PrintOptions, SetFilterOption, SetOperator, SidebarOptions,
   SortModel, TextOperator, ThemeMode, ToolbarOptions,
 } from './core/types'

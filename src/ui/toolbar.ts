@@ -119,6 +119,17 @@ export class Toolbar {
       }))
     }
 
+    // Juste avant le plein écran : deux commodités d'affichage, rangées
+    // ensemble au bout de la barre.
+    if (this.options.printButton === true) {
+      this.right.append(el('button', {
+        class: `${NS}-icon-btn ${NS}-print-btn`,
+        attrs: { type: 'button', title: t.t('print'), 'aria-label': t.t('print') },
+        children: [this.ctx.icon('print')],
+        on: { click: () => { void this.ctx.api.print() } },
+      }))
+    }
+
     // Dernier de la liste : c'est le bouton qui change le moins souvent d'avis
     // (on l'active ou pas, une fois, sur la grille) — les autres, plus
     // fréquents, restent groupés à sa gauche.

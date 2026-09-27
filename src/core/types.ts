@@ -446,6 +446,16 @@ export interface ToolbarOptions {
    * les lignes visibles et la largeur des colonnes.
    */
   fullscreenButton?: boolean
+  /**
+   * Bouton « Imprimer » (icône seule, juste avant le plein écran). Défaut :
+   * `false`, comme les autres boutons de commodité.
+   *
+   * Imprime ce que l'on regarde — colonnes visibles, tri, filtres, recherche —
+   * toutes les lignes filtrées et pas seulement celles à l'écran. Voir
+   * `api.print()` et l'option `print`. L'impression reste accessible au clic
+   * droit même sans ce bouton.
+   */
+  printButton?: boolean
   /** Nœuds libres injectés à gauche de la barre d'outils. */
   slot?: () => Node | null
 }
@@ -480,6 +490,29 @@ export interface ExportOptions {
   excelJs?: () => unknown | Promise<unknown>
   /** Ajoute les auto-filtres Excel sur la ligne d'en-tête. Défaut : true. */
   autoFilter?: boolean
+}
+
+export interface PrintOptions {
+  /**
+   * Titre imprimé en tête de page (et nom proposé à « Enregistrer en PDF »).
+   * Une fonction est lue au moment de l'impression : le titre d'une liste
+   * peut changer après la création de la grille. Défaut : `document.title`.
+   */
+  title?: string | (() => string)
+  /**
+   * Garde-fou : au-delà, l'impression s'arrête et le signale en tête de page.
+   * Défaut : 5 000 — plus bas que l'export, parce qu'un navigateur met en page
+   * un tableau de 100 000 lignes en plusieurs minutes, et que personne ne
+   * relit 2 000 pages.
+   */
+  maxRows?: number
+  /**
+   * `auto` (défaut) passe en paysage dès que les colonnes, à leur largeur
+   * d'écran, ne tiennent plus dans une page portrait.
+   */
+  orientation?: 'auto' | 'portrait' | 'landscape'
+  /** Taille des pages de rapatriement en mode serveur. Défaut : 1000. */
+  pageSize?: number
 }
 
 export interface IsoGridOptions<TRow = AnyRow> {
@@ -709,6 +742,8 @@ export interface IsoGridOptions<TRow = AnyRow> {
   contextMenu?: false | import('../ui/context-menu').ContextMenuOptions<TRow>
   statusBar?: boolean
   export?: ExportOptions
+  /** Réglages de l'impression. Voir `api.print()`. */
+  print?: PrintOptions
 
   /** Bandes alternées sur les lignes. Défaut : true. */
   stripedRows?: boolean
@@ -841,7 +876,7 @@ export type IconName =
   | 'copy' | 'copy-row' | 'copy-table'
   | 'check' | 'chevron-down' | 'chevron-right'
   | 'eye' | 'eye-off' | 'grip' | 'spinner' | 'warning'
-  | 'fullscreen' | 'fullscreen-exit'
+  | 'fullscreen' | 'fullscreen-exit' | 'print'
   | 'views' | 'star'
   | 'edit' | 'external-link' | 'link' | 'document' | 'plus'
 
@@ -897,6 +932,14 @@ export interface IsoGridApi<TRow = AnyRow> {
   /* --- export --- */
   exportExcel(options?: ExportOptions & { onProgress?: (p: ExportProgress) => void }): Promise<void>
   exportCsv(options?: ExportOptions & { onProgress?: (p: ExportProgress) => void }): Promise<void>
+  /**
+   * Ouvre la boîte d'impression du navigateur sur la grille telle qu'on la
+   * regarde : colonnes visibles dans leur ordre, tri, filtres et recherche,
+   * valeurs formatées comme à l'écran, TOUTES les lignes filtrées (rapatriées
+   * page par page en mode serveur, plafonnées par `maxRows`). Les colonnes
+   * `excludeFromExport` n'y figurent pas.
+   */
+  print(options?: PrintOptions): Promise<void>
 
   /* --- sélection --- */
   /** Lignes sélectionnées ET actuellement chargées. Voir `getSelection()`. */

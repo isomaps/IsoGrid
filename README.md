@@ -259,6 +259,34 @@ un second clic sur le bouton — état exposé par `api.isFullscreen()` et
 par exemple). Le `ResizeObserver` déjà posé sur le viewport recalcule seul les
 lignes visibles et la largeur des colonnes, sans code supplémentaire.
 
+## Impression
+
+```ts
+new IsoGrid(el, {
+  toolbar: { printButton: true },            // icône « Imprimer », avant le plein écran
+  print: { title: () => 'Clients actifs' },  // défaut : document.title
+})
+await grid.print()                           // appelable sans le bouton
+```
+
+Imprime **ce qu'on regarde** : colonnes visibles dans leur ordre, tri,
+filtres et recherche, valeurs **formatées comme à l'écran** (`valueFormatter`,
+nombres et dates selon la locale). Et **toutes les lignes filtrées**, pas
+seulement celles à l'écran : en mode serveur, elles sont rapatriées page par
+page comme pour l'export, jusqu'au plafond `print.maxRows` (5 000 par défaut ;
+au-delà, un avertissement s'imprime en tête de page).
+
+On n'imprime pas la grille elle-même — virtualisée, à hauteur fixe, colonnes
+en `sticky`, elle sortirait tronquée — mais un vrai `<table>` construit à part
+et imprimé depuis un iframe caché : pas de fenêtre surgissante, titre et date
+en tête, en-tête de colonnes répété à chaque page, paysage automatique quand
+les colonnes ne tiennent pas en portrait (`print.orientation`). La boîte
+d'impression du navigateur offre « Enregistrer en PDF ».
+
+Les colonnes `excludeFromExport` (cases, actions, détail) n'y figurent pas.
+Le bouton est **opt-in** ; l'entrée « Imprimer » du **clic droit** est active
+par défaut, rangée avec l'export (`contextMenu.printItem: false` la retire).
+
 ## Largeur des colonnes
 
 Par défaut, les colonnes **occupent toute la largeur** de la grille (`fillWidth: true`).
@@ -662,6 +690,7 @@ grille :
 - **Copier la ligne**
 - **Copier la ligne avec les en-têtes**
 - **Exporter en Excel** / **Exporter en CSV**
+- **Imprimer** (voir [Impression](#impression))
 
 Les lignes sont copiées en **TSV** : elles se collent directement dans un
 tableur, colonne par colonne. Le clic droit est écouté sur la cellule et non

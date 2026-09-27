@@ -1,5 +1,5 @@
 import type {
-  AnyRow, CellContext, ColumnDef, Datasource, ExportOptions, ExportProgress,
+  AnyRow, CellContext, ColumnDef, Datasource, ExportOptions, ExportProgress, PrintOptions,
   GridState, IconName, IsoGridApi, IsoGridOptions, LocaleCode, PinPosition,
   SectionInfo, SetFilterOption, SortModel, ThemeMode,
 } from '../core/types'
@@ -18,6 +18,7 @@ import { BlockCache, createHttpDatasource } from '../datasource/server'
 import { ClientDatasource } from '../datasource/client'
 import { normalizeFilter } from '../filters/model'
 import { collectExportData, rawCellValue } from '../export/collect'
+import { buildPrintHtml, printHtml } from '../export/print'
 import { exportToCsv } from '../export/csv'
 import { exportToExcel } from '../export/excel'
 import type { GridContext } from './context'
@@ -2742,6 +2743,66 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       exportToCsv(dataset, { filename: settings.filename })
       options?.onProgress?.({ loaded: dataset.rows.length, total: dataset.rows.length, phase: 'done' })
       if (dataset.truncated) console.warn('[IsoGrid]', this.t.t('exportTruncated'))
+    } catch (error) {
+      this.onLoadError(error)
+      throw error
+    } finally {
+      this.setBusy(false)
+    }
+  }
+
+  /* --- impression --- */
+
+  async print(options?: PrintOptions): Promise<void> {
+    const base = this.options.print ?? {}
+    const maxRows = options?.maxRows ?? base.maxRows ?? 5000
+    const titre = options?.title ?? base.title
+    const title = (typeof titre === 'function' ? titre() : titre) || document.title || ''
+    this.setBusy(true)
+    try {
+      this.cache.requestContext = this.buildRequestContext()
+      // Même collecte que l'export — mêmes colonnes, même périmètre — mais
+      // avec le texte AFFICHÉ : un montant imprimé « 1234.5 » au lieu de
+      // « 1 234,50 » serait une régression par rapport à l'écran.
+      const dataset = await collectExportData({
+        cache: this.cache as BlockCache,
+        columns: this.columnModel.getRenderColumns().map(c => c.def),
+        headerLabel: col => this.t.header(col.header ?? col.id),
+        cellValue: (col, row, rowIndex) => {
+          const def = col as ColumnDef<TRow>
+          return this.formatValue(def, {
+            value: getPath(row, def.field ?? def.id),
+            row: row as TRow,
+            rowIndex,
+            column: def,
+            grid: this,
+          })
+        },
+        options: {
+          source: 'all',
+          maxRows,
+          pageSize: options?.pageSize ?? base.pageSize ?? 1000,
+        },
+      })
+
+      // A4 portrait, marges de 10 mm : ~720 px CSS de large. Les colonnes à
+      // leur largeur d'écran au-delà : paysage.
+      let orientation = options?.orientation ?? base.orientation ?? 'auto'
+      if (orientation === 'auto') {
+        const largeur = this.columnModel.getRenderColumns()
+          .filter(c => !c.def.excludeFromExport)
+          .reduce((sum, c) => sum + c.width, 0)
+        orientation = largeur > 720 ? 'landscape' : 'portrait'
+      }
+
+      const now = this.t.date(new Date(), { dateStyle: 'short', timeStyle: 'short' })
+      await printHtml(buildPrintHtml(dataset, {
+        title,
+        subtitle: `${this.t.t('printedOn')} ${now} · ${this.t.number(dataset.rows.length)} ${this.t.t('rows')}`,
+        truncatedNote: dataset.truncated ? this.t.t('printTruncated') : undefined,
+        orientation,
+        locale: this.t.getLocale(),
+      }))
     } catch (error) {
       this.onLoadError(error)
       throw error

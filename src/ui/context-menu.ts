@@ -6,7 +6,7 @@ import { NS, el, getPath, onDismiss } from './dom'
  * Menu contextuel du corps de la grille (clic droit).
  *
  * Reprend les entrées standard d'AG Grid : copier la cellule, copier la
- * ligne, copier la ligne avec ses en-têtes, puis l'export. C'est la voie la
+ * ligne, copier la ligne avec ses en-têtes, puis l'export et l'impression. C'est la voie la
  * plus directe vers le presse-papiers — sans elle, sortir une seule valeur
  * d'un tableau oblige à passer par un export complet.
  */
@@ -34,6 +34,8 @@ export interface ContextMenuOptions<TRow = AnyRow> {
   copyItems?: boolean
   /** Masque les entrées d'export. */
   exportItems?: boolean
+  /** Masque l'entrée « Imprimer », rangée avec l'export. */
+  printItem?: boolean
   /**
    * Remplace entièrement le menu. Recevoir les entrées par défaut permet de
    * les réordonner ou d'en insérer plutôt que de tout réécrire.
@@ -220,12 +222,21 @@ export class ContextMenu {
       )
     }
 
-    if (this.options.exportItems !== false) {
+    const exporter = this.options.exportItems !== false
+    const imprimer = this.options.printItem !== false
+    if (exporter || imprimer) {
       if (defaults.length > 0) defaults.push({ separator: true })
-      defaults.push(
-        { label: t.t('exportExcel'), icon: 'excel', action: () => this.ctx.api.exportExcel() },
-        { label: t.t('exportCsv'), icon: 'csv', action: () => this.ctx.api.exportCsv() },
-      )
+      if (exporter) {
+        defaults.push(
+          { label: t.t('exportExcel'), icon: 'excel', action: () => this.ctx.api.exportExcel() },
+          { label: t.t('exportCsv'), icon: 'csv', action: () => this.ctx.api.exportCsv() },
+        )
+      }
+      // Avec l'export : c'est la même question (« sortir cette liste »), et
+      // le même périmètre — toute la liste filtrée, pas la ligne cliquée.
+      if (imprimer) {
+        defaults.push({ label: t.t('print'), icon: 'print', action: () => this.ctx.api.print() })
+      }
     }
     return defaults
   }
