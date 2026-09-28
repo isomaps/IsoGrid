@@ -1084,7 +1084,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
    */
   private applyColumnGeometry(): void {
     for (const column of this.columnModel.getRenderColumns()) {
-      const selector = `[data-col-id="${CSS.escape(column.id)}"]`
+      // Les cellules seules (corps, pied, en-tête) : les lignes du panneau
+      // « Colonnes » portent aussi `data-col-id`, et recevaient la largeur de
+      // la colonne — une colonne de 44 px n'y laissait plus voir que la case.
+      const id = CSS.escape(column.id)
+      const selector = `[role="gridcell"][data-col-id="${id}"], [role="columnheader"][data-col-id="${id}"]`
       for (const cell of Array.from(this.root.querySelectorAll<HTMLElement>(selector))) {
         cell.style.width = `${column.width}px`
         if (!column.pinned) continue

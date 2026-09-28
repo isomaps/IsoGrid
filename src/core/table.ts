@@ -385,6 +385,7 @@ export class ColumnModel {
     // colonne réapparaîtrait en double, comme colonne ET comme niveau de groupe.
     const restoredVisibility = { ...(init.columnVisibility ?? visibility) }
     for (const id of grouped) restoredVisibility[id] = false
+    this.forceVisible(restoredVisibility)
 
     if (actions && !restoredPinning.end.includes(actions.id)) {
       restoredPinning.end = [...restoredPinning.end, actions.id]
@@ -731,9 +732,22 @@ export class ColumnModel {
     }
   }
 
+  /**
+   * Remet visibles les colonnes qu'on ne peut pas masquer (`lockVisible`) ou
+   * pas réafficher (`hideInPanel`, absente du panneau). Un état enregistré
+   * AVANT qu'une colonne ne reçoive l'un de ces drapeaux peut la porter
+   * masquée : sans cela, elle disparaîtrait pour de bon.
+   */
+  private forceVisible(vis: Record<string, boolean>): Record<string, boolean> {
+    for (const d of this.orderedDefs ?? this.opts.columns) {
+      if ((d.lockVisible || d.hideInPanel) && vis[d.id] === false) vis[d.id] = true
+    }
+    return vis
+  }
+
   setState(patch: Partial<GridState>): void {
     if (patch.columnOrder) this.table.setColumnOrder(patch.columnOrder)
-    if (patch.columnVisibility) this.table.setColumnVisibility(patch.columnVisibility)
+    if (patch.columnVisibility) this.table.setColumnVisibility(this.forceVisible({ ...patch.columnVisibility }))
     if (patch.columnPinning) this.table.setColumnPinning(patch.columnPinning)
     if (patch.columnSizing) this.table.setColumnSizing(patch.columnSizing)
     if (patch.sort) this.table.setSorting(patch.sort)
