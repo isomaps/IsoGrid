@@ -499,7 +499,7 @@ export class ColumnModel {
     const start = known(state.columnPinning?.start)
     const end = known(state.columnPinning?.end)
     const middle = ids.filter(id => !start.includes(id) && !end.includes(id))
-    return start.concat(middle, end).map(id => byId.get(id)!)
+    return start.concat(middle, end).map(id => byId.get(id)!).filter(d => !d.hideInPanel)
   }
 
   /** Défs dans l'ordre d'affichage courant (ordre + épinglage appliqués). */

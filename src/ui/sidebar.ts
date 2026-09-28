@@ -162,7 +162,8 @@ export class Sidebar {
     const next: Record<string, boolean> = {}
     for (const def of this.ctx.columns.getAllDefs()) {
       // Une colonne verrouillée reste visible quoi qu'il arrive.
-      next[def.id] = def.lockVisible ? true : visible
+      // Une colonne absente du panneau n'y serait plus réaffichable.
+      next[def.id] = def.lockVisible || def.hideInPanel ? true : visible
     }
     this.ctx.columns.setState({ columnVisibility: next })
     this.ctx.emitState()

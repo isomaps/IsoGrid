@@ -152,6 +152,13 @@ export interface ColumnDef<TRow = AnyRow> {
    * texte brut, comme `header`.
    */
   label?: string
+  /**
+   * Retire la colonne du panneau « Colonnes » : elle reste affichée, mais ne
+   * s'y masque ni ne s'y déplace — une colonne d'outil (bouton d'ouverture,
+   * par exemple) qui n'a rien à faire dans une liste de données. « Tout
+   * masquer » l'épargne aussi : on ne pourrait plus la réafficher.
+   */
+  hideInPanel?: boolean
 
   /**
    * Valeurs proposées par un filtre `set`. Si absent en mode serveur, elles
