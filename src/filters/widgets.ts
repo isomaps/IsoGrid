@@ -1,3 +1,4 @@
+import { columnName } from '../core/table'
 import type {
   ColumnDef, ColumnFilterConfig, ColumnFilterModel, FilterCondition, FilterOperator, SetFilterOption,
 } from '../core/types'
@@ -352,7 +353,7 @@ export function openFilterPopover(
   const popover = el('div', { class: `${NS}-popover ${NS}-filter-popover`, attrs: { role: 'dialog' } })
   popover.append(el('div', {
     class: `${NS}-popover-title`,
-    text: `${ctx.t.t('filterBy')} · ${ctx.t.header(column.header ?? column.id)}`,
+    text: `${ctx.t.t('filterBy')} · ${ctx.t.header(columnName(column))}`,
   }))
 
   const editor = new FilterEditor(ctx, column, (model) => {

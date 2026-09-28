@@ -1,4 +1,4 @@
-import type { RenderColumn, RenderHeader } from '../core/table'
+import { columnName, type RenderColumn, type RenderHeader } from '../core/table'
 import type { GridContext } from './context'
 import { NS, el, onDismiss, positionFloating } from './dom'
 import { openFilterPopover } from '../filters/widgets'
@@ -104,6 +104,9 @@ export class HeaderRenderer {
           : sortState.direction === 'desc' ? 'descending'
             : sortable ? 'none' : undefined,
         title: def.headerTooltip ?? undefined,
+        // En-tête vide (colonne d'icônes) : son nom en bulle au survol.
+        'data-isg-tip': !def.header && def.label && !def.headerTooltip ? t.header(def.label) : undefined,
+        'aria-label': !def.header && def.label ? t.header(def.label) : undefined,
         tabindex: 0,
       },
       style: { width: `${column.width}px` },
@@ -152,7 +155,7 @@ export class HeaderRenderer {
         attrs: {
           type: 'button',
           title: t.t('filterBy'),
-          'aria-label': `${t.t('filterBy')} ${t.header(def.header ?? def.id)}`,
+          'aria-label': `${t.t('filterBy')} ${t.header(columnName(def))}`,
         },
         children: [this.ctx.icon(isFiltered ? 'filter' : 'filter-column')],
         on: {

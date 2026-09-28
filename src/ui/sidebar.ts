@@ -1,4 +1,5 @@
 import type { ColumnDef, SidebarOptions } from '../core/types'
+import { columnName } from '../core/table'
 import type { GridContext } from './context'
 import { NS, el } from './dom'
 import { FilterEditor } from '../filters/widgets'
@@ -143,7 +144,7 @@ export class Sidebar {
 
     const needle = this.columnSearch.trim().toLocaleLowerCase()
     const visible = defs.filter(d =>
-      !needle || t.header(d.header ?? d.id).toLocaleLowerCase().includes(needle))
+      !needle || t.header(columnName(d)).toLocaleLowerCase().includes(needle))
 
     if (visible.length === 0) {
       this.body.append(el('div', { class: `${NS}-panel-empty`, text: t.t('noColumnMatch') }))
@@ -204,7 +205,7 @@ export class Sidebar {
             },
           },
         }),
-        el('span', { class: `${NS}-column-name`, text: t.header(def.header ?? def.id) }),
+        el('span', { class: `${NS}-column-name`, text: t.header(columnName(def)) }),
       ],
     }))
 
@@ -291,7 +292,7 @@ export class Sidebar {
         attrs: { type: 'button', 'aria-expanded': isActive },
         children: [
           this.ctx.icon('chevron-right'),
-          el('span', { class: `${NS}-accordion-title`, text: t.header(def.header ?? def.id) }),
+          el('span', { class: `${NS}-accordion-title`, text: t.header(columnName(def)) }),
           isActive ? el('span', { class: `${NS}-badge`, text: '1' }) : null,
         ],
       })

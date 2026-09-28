@@ -145,6 +145,13 @@ export interface ColumnDef<TRow = AnyRow> {
 
   /** Exclut la colonne de l'export sans la masquer à l'écran. */
   excludeFromExport?: boolean
+  /**
+   * Nom de la colonne quand son en-tête est vide — colonne d'icônes, de
+   * cases, de boutons. Affiché dans le panneau « Colonnes » (sinon la ligne y
+   * est anonyme) et en bulle au survol de l'en-tête. Clé de catalogue ou
+   * texte brut, comme `header`.
+   */
+  label?: string
 
   /**
    * Valeurs proposées par un filtre `set`. Si absent en mode serveur, elles

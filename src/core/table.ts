@@ -113,6 +113,15 @@ export interface RenderHeader {
   width: number
 }
 
+/**
+ * Nom d'une colonne pour les listes et les menus : son en-tête, sinon son
+ * `label` (colonnes à en-tête vide), sinon son identifiant. À passer à
+ * `Translator.header()`.
+ */
+export function columnName(def: ColumnDef): string {
+  return def.header || def.label || def.id
+}
+
 export class ColumnModel {
   private table: TableInstance
   private defs = new Map<string, ColumnDef>()
@@ -144,6 +153,7 @@ export class ColumnModel {
     return {
       id: ROW_ACTIONS_COLUMN_ID,
       header: '',
+      label: 'rowActions',
       width: cfg.width,
       minWidth: cfg.width,
       maxWidth: cfg.width,
@@ -165,6 +175,7 @@ export class ColumnModel {
     return {
       id: DETAIL_COLUMN_ID,
       header: '',
+      label: 'detailColumn',
       width: cfg.width,
       minWidth: cfg.width,
       maxWidth: cfg.width,
@@ -186,6 +197,7 @@ export class ColumnModel {
     return {
       id: GROUP_COLUMN_ID,
       header: '',
+      label: 'groupColumn',
       width: cfg.width,
       minWidth: 120,
       pinned: 'start',
@@ -204,6 +216,7 @@ export class ColumnModel {
     return {
       id: SELECTION_COLUMN_ID,
       header: '',
+      label: 'selectionColumn',
       width: cfg.width,
       minWidth: cfg.width,
       maxWidth: cfg.width,

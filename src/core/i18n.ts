@@ -16,7 +16,7 @@ export type MessageKey =
   | 'and' | 'or' | 'addCondition' | 'removeCondition'
   | 'selectAll' | 'deselectAll' | 'noValues' | 'searchValues' | 'blankValue'
   | 'selectRow' | 'selectAllRows' | 'clearSelection' | 'allRowsSelected'
-  | 'rowActions'
+  | 'rowActions' | 'selectionColumn' | 'detailColumn' | 'groupColumn'
   /* Libellés courts des agrégats, au pied de colonne. */
   | 'aggSum' | 'aggMin' | 'aggMax' | 'aggAvg' | 'aggCount'
   | 'groupBy' | 'ungroup' | 'expandGroup' | 'collapseGroup'
@@ -43,6 +43,9 @@ const fr: Catalog = {
   aggAvg: 'MOY',
   aggCount: 'NB',
   rowActions: 'Actions',
+  selectionColumn: 'Sélection',
+  detailColumn: 'Détail',
+  groupColumn: 'Groupe',
   groupBy: 'Grouper par cette colonne',
   ungroup: 'Retirer du groupage',
   expandGroup: 'Déplier le groupe',
@@ -170,6 +173,9 @@ const en: Catalog = {
   aggAvg: 'AVG',
   aggCount: 'CNT',
   rowActions: 'Actions',
+  selectionColumn: 'Selection',
+  detailColumn: 'Detail',
+  groupColumn: 'Group',
   groupBy: 'Group by this column',
   ungroup: 'Remove from grouping',
   expandGroup: 'Expand group',
@@ -297,6 +303,9 @@ const de: Catalog = {
   aggAvg: 'MW',
   aggCount: 'ANZ',
   rowActions: 'Aktionen',
+  selectionColumn: 'Auswahl',
+  detailColumn: 'Detail',
+  groupColumn: 'Gruppe',
   groupBy: 'Nach dieser Spalte gruppieren',
   ungroup: 'Aus der Gruppierung entfernen',
   expandGroup: 'Gruppe aufklappen',
@@ -424,6 +433,9 @@ const es: Catalog = {
   aggAvg: 'PROM',
   aggCount: 'REC',
   rowActions: 'Acciones',
+  selectionColumn: 'Selección',
+  detailColumn: 'Detalle',
+  groupColumn: 'Grupo',
   groupBy: 'Agrupar por esta columna',
   ungroup: 'Quitar de la agrupación',
   expandGroup: 'Desplegar el grupo',
@@ -551,6 +563,9 @@ const it: Catalog = {
   aggAvg: 'MED',
   aggCount: 'CONT',
   rowActions: 'Azioni',
+  selectionColumn: 'Selezione',
+  detailColumn: 'Dettaglio',
+  groupColumn: 'Gruppo',
   groupBy: 'Raggruppa per questa colonna',
   ungroup: 'Rimuovi dal raggruppamento',
   expandGroup: 'Espandi il gruppo',
@@ -678,6 +693,9 @@ const nl: Catalog = {
   aggAvg: 'GEM',
   aggCount: 'AANT',
   rowActions: 'Acties',
+  selectionColumn: 'Selectie',
+  detailColumn: 'Detail',
+  groupColumn: 'Groep',
   groupBy: 'Groeperen op deze kolom',
   ungroup: 'Uit groepering verwijderen',
   expandGroup: 'Groep uitvouwen',
@@ -805,6 +823,9 @@ const pl: Catalog = {
   aggAvg: 'ŚR',
   aggCount: 'LICZ',
   rowActions: 'Akcje',
+  selectionColumn: 'Zaznaczenie',
+  detailColumn: 'Szczegóły',
+  groupColumn: 'Grupa',
   groupBy: 'Grupuj według tej kolumny',
   ungroup: 'Usuń z grupowania',
   expandGroup: 'Rozwiń grupę',
@@ -932,6 +953,9 @@ const ru: Catalog = {
   aggAvg: 'СР',
   aggCount: 'КОЛ',
   rowActions: 'Действия',
+  selectionColumn: 'Выбор',
+  detailColumn: 'Подробности',
+  groupColumn: 'Группа',
   groupBy: 'Группировать по этому столбцу',
   ungroup: 'Убрать из группировки',
   expandGroup: 'Развернуть группу',

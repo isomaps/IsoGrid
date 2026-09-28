@@ -100,6 +100,8 @@ export class Tooltips {
   }
 
   private estIcone(n: HTMLElement): boolean {
+    // Posé exprès, sans `title` : la bulle est voulue, quel que soit l'élément.
+    if (n.hasAttribute('data-isg-tip') && !n.hasAttribute('title') && n.getAttribute('data-isg-tip')) return true
     if (n.classList.contains(`${NS}-icon-btn`)) return true
     const bouton = n.tagName === 'BUTTON' || n.getAttribute('role') === 'button' || n.tagName.includes('-')
     return bouton && (n.textContent ?? '').trim() === ''
