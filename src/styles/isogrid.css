@@ -60,6 +60,14 @@
      ils passeraient derrière TOUT. D'où des valeurs littérales pour eux. */
   --isg-z-fullscreen: 2147483000;
 
+  /* Contexte d'empilement propre : les z-index internes (en-tête et pied
+     collants 4, message vide 6…) ne valent qu'à l'intérieur de la grille.
+     Sans cela ils se mesuraient à ceux de la page hôte, et l'en-tête passait
+     devant un tiroir latéral ou le voile d'une modale (Solune, 29/09).
+     Sans effet sur le plein écran (z-index de la racine elle-même) ni sur
+     les flottants, téléportés hors de la racine. */
+  isolation: isolate;
+
   display: flex;
   flex-direction: column;
   min-height: 0;
