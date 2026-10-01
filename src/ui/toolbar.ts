@@ -201,17 +201,25 @@ export class Toolbar {
     let dispose = () => {}
     const close = () => { dispose(); menu.remove() }
 
+    // Même annonce de périmètre que dans le menu contextuel : export réduit
+    // à la sélection quand `export.useSelection` est actif et que des lignes
+    // sont cochées. Le menu se construit au clic, le suffixe est donc à jour.
+    const suffixe = this.ctx.options.export?.useSelection
+      && this.ctx.api.getSelectedRows().length > 0
+      ? ` ${t.t('selectionSuffix')}`
+      : ''
+
     menu.append(
       el('button', {
         class: `${NS}-menu-item`,
         attrs: { type: 'button', role: 'menuitem' },
-        children: [this.ctx.icon('excel'), el('span', { text: t.t('exportExcel') })],
+        children: [this.ctx.icon('excel'), el('span', { text: `${t.t('exportExcel')}${suffixe}` })],
         on: { click: () => { close(); void this.ctx.api.exportExcel() } },
       }),
       el('button', {
         class: `${NS}-menu-item`,
         attrs: { type: 'button', role: 'menuitem' },
-        children: [this.ctx.icon('csv'), el('span', { text: t.t('exportCsv') })],
+        children: [this.ctx.icon('csv'), el('span', { text: `${t.t('exportCsv')}${suffixe}` })],
         on: { click: () => { close(); void this.ctx.api.exportCsv() } },
       }),
     )

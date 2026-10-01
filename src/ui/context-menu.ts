@@ -66,6 +66,17 @@ export interface ContextMenuOptions<TRow = AnyRow> {
    * l'arment : la souris et le stylet gardent leur clic droit.
    */
   longPress?: number | false
+  /**
+   * Zone verticale utile de la page, lue à chaque ouverture du menu.
+   *
+   * Par défaut le menu se rabat dans la FENÊTRE — mais quand l'hôte a un
+   * bandeau fixe (en-tête d'application, barre d'outils collante), un menu
+   * long remonte dessous et ses premières entrées deviennent inatteignables.
+   * `top` borne le haut du menu ; `bottom` (défaut : bas de la fenêtre) borne
+   * le bas. La hauteur restante est posée en `max-height` — le CSS du menu
+   * fait déjà défiler son contenu.
+   */
+  menuBoundary?: () => { top: number; bottom?: number }
 }
 
 /**
@@ -248,35 +259,55 @@ export class ContextMenu {
     const imprimer = this.options.printItem !== false
     if (exporter || imprimer) {
       if (defaults.length > 0) defaults.push({ separator: true })
+      // `useSelection` actif et lignes cochées : le libellé annonce le
+      // périmètre réduit — sans lui, rien ne dirait pourquoi le fichier ne
+      // contient que trois lignes. Les entrées sont construites à chaque
+      // ouverture du menu, le suffixe suit donc l'état de la sélection.
+      const coche = this.ctx.api.getSelectedRows().length > 0
+      const sufExport = this.ctx.options.export?.useSelection && coche ? ` ${t.t('selectionSuffix')}` : ''
+      const sufPrint = this.ctx.options.print?.useSelection && coche ? ` ${t.t('selectionSuffix')}` : ''
       if (exporter) {
         defaults.push(
-          { label: t.t('exportExcel'), icon: 'excel', action: () => this.ctx.api.exportExcel() },
-          { label: t.t('exportCsv'), icon: 'csv', action: () => this.ctx.api.exportCsv() },
+          { label: `${t.t('exportExcel')}${sufExport}`, icon: 'excel', action: () => this.ctx.api.exportExcel() },
+          { label: `${t.t('exportCsv')}${sufExport}`, icon: 'csv', action: () => this.ctx.api.exportCsv() },
         )
       }
       // Avec l'export : c'est la même question (« sortir cette liste »), et
       // le même périmètre — toute la liste filtrée, pas la ligne cliquée.
       if (imprimer) {
-        defaults.push({ label: t.t('print'), icon: 'print', action: () => this.ctx.api.print() })
+        defaults.push({ label: `${t.t('print')}${sufPrint}`, icon: 'print', action: () => this.ctx.api.print() })
       }
     }
     return defaults
   }
 
-  /** Ancre le menu au curseur, en le rabattant s'il déborde de la fenêtre. */
+  /**
+   * Ancre le menu au curseur, en le rabattant s'il déborde de la fenêtre —
+   * ou de la zone donnée par `menuBoundary` (bandeau fixe de l'hôte).
+   */
   private positionAtPointer(menu: HTMLElement, x: number, y: number): void {
+    const boundary = this.options.menuBoundary?.()
+    const minTop = Math.max(8, boundary?.top ?? 8)
+    const maxBottom = Math.min(window.innerHeight - 8, boundary?.bottom ?? window.innerHeight - 8)
+
     menu.style.position = 'fixed'
     menu.style.visibility = 'hidden'
     menu.style.left = '0px'
     menu.style.top = '0px'
+    // Jamais plus haut que la zone utile : au-delà, le contenu défile
+    // (l'overflow est dans la feuille de style du menu).
+    menu.style.maxHeight = `${Math.round(maxBottom - minTop)}px`
     const rect = menu.getBoundingClientRect()
 
     const left = x + rect.width > window.innerWidth - 8
       ? Math.max(8, x - rect.width)
       : x
-    const top = y + rect.height > window.innerHeight - 8
-      ? Math.max(8, y - rect.height)
+    let top = y + rect.height > maxBottom
+      ? y - rect.height
       : y
+    // Le rabat vers le haut peut passer sous le bandeau : on borne, et la
+    // `max-height` garantit que le bas reste dans la zone.
+    top = Math.max(minTop, top)
 
     menu.style.left = `${Math.round(left)}px`
     menu.style.top = `${Math.round(top)}px`

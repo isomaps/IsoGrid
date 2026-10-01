@@ -300,6 +300,10 @@ export class Sidebar {
 
       const item = el('div', {
         class: `${NS}-accordion${isActive ? ` ${NS}-open` : ''}`,
+        // Même marquage que les lignes du panneau Colonnes : l'hôte peut
+        // retrouver l'accordéon d'une colonne pour le décorer (indicateur
+        // métier, aide contextuelle) sans dépendre de l'ordre d'affichage.
+        attrs: { 'data-col-id': def.id },
         children: [header, content],
       })
 

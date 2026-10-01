@@ -15,6 +15,11 @@ export interface ExportDataset {
 
 export interface CollectOptions {
   cache: BlockCache
+  /**
+   * Lignes imposées — l'export de la sélection passe par ici. Le cache n'est
+   * alors pas consulté : les lignes cochées sont par définition déjà chargées.
+   */
+  rows?: AnyRow[]
   columns: ColumnDef[]
   headerLabel: (col: ColumnDef) => string
   cellValue: (col: ColumnDef, row: AnyRow, rowIndex: number) => ExportCell
@@ -41,6 +46,12 @@ export async function collectExportData(opts: CollectOptions): Promise<ExportDat
       if (rows.length >= opts.options.maxRows) { truncated = true; return }
       rows.push(columns.map(col => opts.cellValue(col, row, startIndex + i)))
     })
+  }
+
+  if (opts.rows) {
+    pushRows(opts.rows, 0)
+    opts.onProgress?.({ loaded: rows.length, total: rows.length, phase: 'building' })
+    return { columns, headers, rows, truncated }
   }
 
   if (opts.options.source === 'loaded') {

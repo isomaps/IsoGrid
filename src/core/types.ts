@@ -504,6 +504,12 @@ export interface ExportOptions {
   excelJs?: () => unknown | Promise<unknown>
   /** Ajoute les auto-filtres Excel sur la ligne d'en-tête. Défaut : true. */
   autoFilter?: boolean
+  /**
+   * Quand des lignes sont cochées, l'export ne porte que sur elles — même
+   * contrat que le pied de grille : lignes cochées ET chargées. Sélection
+   * vide : export normal, jamais un fichier vide. Défaut : `false`.
+   */
+  useSelection?: boolean
 }
 
 export interface PrintOptions {
@@ -527,6 +533,11 @@ export interface PrintOptions {
   orientation?: 'auto' | 'portrait' | 'landscape'
   /** Taille des pages de rapatriement en mode serveur. Défaut : 1000. */
   pageSize?: number
+  /**
+   * Quand des lignes sont cochées, l'impression ne porte que sur elles —
+   * même contrat que `export.useSelection`. Défaut : `false`.
+   */
+  useSelection?: boolean
 }
 
 export interface IsoGridOptions<TRow = AnyRow> {

@@ -111,6 +111,13 @@ return IsoGridQuery::make($request)
 `allow()` est **obligatoire** : un identifiant de colonne ne peut pas être lié
 en paramètre SQL, la liste blanche est la seule protection contre l'injection.
 
+## Tri
+
+Clic d'en-tête : ascendant → descendant → aucun. **Maj-clic ou Ctrl-clic**
+(⌘-clic sur Mac) ajoute la colonne au tri existant — tri multi-colonnes,
+l'indice du niveau s'affiche à côté de la flèche. Au clavier : Entrée ou
+Espace sur l'en-tête, avec les mêmes modificateurs.
+
 ## Filtres
 
 Cinq types : `text`, `number`, `date`, `boolean`, `set`. Jusqu'à deux
@@ -119,6 +126,14 @@ conditions par colonne, jointes par `ET`/`OU`. Les opérateurs sont fermés
 
 Le type est déduit du `type` de colonne ; `filter: false` désactive, un objet
 `{ type, operators, defaultOperator, debounce, hideSearch }` affine.
+
+Le filtre `boolean` est à **trois états** : « Oui », « Non », et « (les
+deux) » — l'état d'une condition vierge, qui ne filtre rien. Le choisir
+retire le filtre de l'état, comme « Effacer le filtre ».
+
+Dans le panneau latéral « Filtres », chaque accordéon de colonne porte
+`data-col-id` — comme les lignes du panneau « Colonnes » — pour que l'hôte
+puisse le retrouver et le décorer (indicateur métier, aide contextuelle).
 
 ## Export
 
@@ -131,6 +146,11 @@ En mode serveur, `source: 'all'` **rapatrie tout le jeu filtré** page par page
 (1 000 lignes par défaut) avant d'écrire le fichier — c'est la contrepartie
 d'un export qui tourne dans le navigateur. `source: 'loaded'` n'exporte que ce
 qui est déjà en cache. `maxRows` est un garde-fou dur.
+
+`export.useSelection: true` restreint l'export aux **lignes cochées** quand il
+y en a — même contrat que le pied de grille sur sélection : lignes cochées ET
+chargées. Les entrées « Exporter… » des menus s'affichent alors suffixées
+« (sélection) ». Sélection vide : export complet, jamais un fichier vide.
 
 Le `.xlsx` produit fige la ligne d'en-tête **et les colonnes épinglées à
 `start`**, pose les auto-filtres, et applique les formats de nombre/date par
@@ -282,6 +302,11 @@ et imprimé depuis un iframe caché : pas de fenêtre surgissante, titre et date
 en tête, en-tête de colonnes répété à chaque page, paysage automatique quand
 les colonnes ne tiennent pas en portrait (`print.orientation`). La boîte
 d'impression du navigateur offre « Enregistrer en PDF ».
+
+`print.useSelection: true` imprime les **lignes cochées** quand il y en a,
+même contrat que `export.useSelection` ; l'entrée « Imprimer » du clic droit
+est alors suffixée « (sélection) » (l'infobulle du bouton de la barre
+d'outils, rendue une fois, ne l'est pas).
 
 Les colonnes `excludeFromExport` (cases, actions, détail) n'y figurent pas.
 Le bouton est **opt-in** ; l'entrée « Imprimer » du **clic droit** est active
@@ -720,6 +745,12 @@ pour ranger un menu long par thèmes, et porter un **pictogramme fourni par
 l'hôte** (`iconNode: () => node`, prioritaire sur `icon`) quand ses icônes
 viennent de son propre jeu. `title` donne une infobulle à l'entrée — pourquoi
 elle est grisée, par exemple. Un menu plus haut que la fenêtre défile.
+
+`menuBoundary: () => ({ top, bottom? })` borne verticalement le menu, lu à
+chaque ouverture : quand l'hôte a un **bandeau fixe**, un menu long remontait
+dessous et ses premières entrées devenaient inatteignables. Le haut du menu ne
+dépasse jamais `top`, la hauteur restante devient sa `max-height` — le contenu
+défile. Sans l'option : la fenêtre, comme avant.
 
 **Au doigt**, un **appui long** (500 ms, `contextMenu.longPress`) ouvre ce même
 menu, à l'endroit touché : iOS n'émet jamais `contextmenu`, sans quoi rien de

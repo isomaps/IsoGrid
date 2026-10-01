@@ -2689,7 +2689,21 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       freezeHeader: override?.freezeHeader ?? base.freezeHeader ?? true,
       autoFilter: override?.autoFilter ?? base.autoFilter ?? true,
       excelJs: override?.excelJs ?? base.excelJs,
+      useSelection: override?.useSelection ?? base.useSelection ?? false,
     }
+  }
+
+  /**
+   * Lignes cochées à exporter/imprimer, ou `null` pour le périmètre normal.
+   *
+   * Même contrat que le pied de grille sur sélection : lignes cochées ET
+   * chargées. Une sélection vide ne produit jamais un fichier vide — on
+   * retombe sur l'export complet.
+   */
+  private selectionForOutput(useSelection: boolean): TRow[] | null {
+    if (!useSelection) return null
+    const selection = this.getSelectedRows()
+    return selection.length > 0 ? selection : null
   }
 
   private async buildExportDataset(
@@ -2699,6 +2713,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.cache.requestContext = this.buildRequestContext()
     return collectExportData({
       cache: this.cache as BlockCache,
+      rows: (this.selectionForOutput(settings.useSelection) ?? undefined) as AnyRow[] | undefined,
       columns: this.columnModel.getRenderColumns().map(c => c.def),
       headerLabel: col => this.t.header(col.header ?? col.id),
       cellValue: (col, row, rowIndex) => {
@@ -2765,6 +2780,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const maxRows = options?.maxRows ?? base.maxRows ?? 5000
     const titre = options?.title ?? base.title
     const title = (typeof titre === 'function' ? titre() : titre) || document.title || ''
+    const useSelection = options?.useSelection ?? base.useSelection ?? false
     this.setBusy(true)
     try {
       this.cache.requestContext = this.buildRequestContext()
@@ -2773,6 +2789,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       // « 1 234,50 » serait une régression par rapport à l'écran.
       const dataset = await collectExportData({
         cache: this.cache as BlockCache,
+        rows: (this.selectionForOutput(useSelection) ?? undefined) as AnyRow[] | undefined,
         columns: this.columnModel.getRenderColumns().map(c => c.def),
         headerLabel: col => this.t.header(col.header ?? col.id),
         cellValue: (col, row, rowIndex) => {

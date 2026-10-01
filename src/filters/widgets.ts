@@ -161,15 +161,25 @@ export class FilterEditor {
     const debounced = debounce(() => this.commit(), this.config.debounce ?? 300)
 
     if (this.config.type === 'boolean') {
+      // Trois états, pas deux : une condition vierge affiche « (les deux) »
+      // et ne filtre rien. Présélectionner « Oui » mentait — le filtre
+      // semblait posé alors qu'aucune valeur n'avait été choisie, et revenir
+      // à « tout voir » obligeait à passer par « Effacer le filtre ».
+      const isTrue = cond.value === true || cond.value === 'true'
+      const isFalse = cond.value === false || cond.value === 'false'
       return [el('select', {
         class: `${NS}-select`,
         children: [
-          el('option', { attrs: { value: 'true', selected: cond.value !== false && cond.value !== 'false' }, text: this.ctx.t.t('true') }),
-          el('option', { attrs: { value: 'false', selected: cond.value === false || cond.value === 'false' }, text: this.ctx.t.t('false') }),
+          el('option', { attrs: { value: '', selected: !isTrue && !isFalse }, text: this.ctx.t.t('bothValues') }),
+          el('option', { attrs: { value: 'true', selected: isTrue }, text: this.ctx.t.t('true') }),
+          el('option', { attrs: { value: 'false', selected: isFalse }, text: this.ctx.t.t('false') }),
         ],
         on: {
           change: (e: Event) => {
-            cond.value = (e.target as HTMLSelectElement).value === 'true'
+            const raw = (e.target as HTMLSelectElement).value
+            // `undefined` rend la condition incomplète : `normalizeFilter`
+            // retire alors le filtre de l'état — exactement « les deux ».
+            cond.value = raw === '' ? undefined : raw === 'true'
             this.commit()
           },
         },

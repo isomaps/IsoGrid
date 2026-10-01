@@ -136,7 +136,11 @@ export class HeaderRenderer {
       labelBox.append(sortBox)
 
       const toggle = (e: MouseEvent | KeyboardEvent) => {
-        this.ctx.columns.toggleSort(column.id, e.shiftKey)
+        // Ctrl/Cmd-clic ajoute la colonne au tri existant, comme Maj-clic :
+        // Maj-clic est la convention des tableurs, mais Maj+clic sélectionne
+        // du texte dans certains hôtes et personne ne la devine — Ctrl (et ⌘
+        // sur Mac) est le geste « cumuler » que tout le monde connaît.
+        this.ctx.columns.toggleSort(column.id, e.shiftKey || e.ctrlKey || e.metaKey)
         this.ctx.reload()
       }
       labelBox.addEventListener('click', toggle)

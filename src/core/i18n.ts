@@ -25,7 +25,8 @@ export type MessageKey =
   | 'export' | 'exportExcel' | 'exportCsv' | 'exporting' | 'exportRowsFetched'
   | 'exportTruncated' | 'exportFailed' | 'exportNoExcelLib'
   | 'print' | 'printedOn' | 'printTruncated'
-  | 'true' | 'false'
+  | 'true' | 'false' | 'bothValues'
+  | 'selectionSuffix'
   | 'opContains' | 'opNotContains' | 'opEquals' | 'opNotEquals'
   | 'opStartsWith' | 'opEndsWith' | 'opBlank' | 'opNotBlank'
   | 'opGt' | 'opGte' | 'opLt' | 'opLte' | 'opBetween'
@@ -120,6 +121,8 @@ const fr: Catalog = {
   exportNoExcelLib: "La bibliothèque Excel n'est pas installée",
   true: 'Oui',
   false: 'Non',
+  bothValues: '(les deux)',
+  selectionSuffix: '(sélection)',
   opContains: 'contient',
   opNotContains: 'ne contient pas',
   opEquals: 'égal à',
@@ -250,6 +253,8 @@ const en: Catalog = {
   exportNoExcelLib: 'The Excel library is not installed',
   true: 'Yes',
   false: 'No',
+  bothValues: '(both)',
+  selectionSuffix: '(selection)',
   opContains: 'contains',
   opNotContains: 'does not contain',
   opEquals: 'equals',
@@ -380,6 +385,8 @@ const de: Catalog = {
   exportNoExcelLib: 'Die Excel-Bibliothek ist nicht installiert',
   true: 'Ja',
   false: 'Nein',
+  bothValues: '(beide)',
+  selectionSuffix: '(Auswahl)',
   opContains: 'enthält',
   opNotContains: 'enthält nicht',
   opEquals: 'gleich',
@@ -510,6 +517,8 @@ const es: Catalog = {
   exportNoExcelLib: 'La biblioteca de Excel no está instalada',
   true: 'Sí',
   false: 'No',
+  bothValues: '(ambos)',
+  selectionSuffix: '(selección)',
   opContains: 'contiene',
   opNotContains: 'no contiene',
   opEquals: 'igual a',
@@ -640,6 +649,8 @@ const it: Catalog = {
   exportNoExcelLib: 'La libreria Excel non è installata',
   true: 'Sì',
   false: 'No',
+  bothValues: '(entrambi)',
+  selectionSuffix: '(selezione)',
   opContains: 'contiene',
   opNotContains: 'non contiene',
   opEquals: 'uguale a',
@@ -770,6 +781,8 @@ const nl: Catalog = {
   exportNoExcelLib: 'De Excel-bibliotheek is niet geïnstalleerd',
   true: 'Ja',
   false: 'Nee',
+  bothValues: '(beide)',
+  selectionSuffix: '(selectie)',
   opContains: 'bevat',
   opNotContains: 'bevat niet',
   opEquals: 'is gelijk aan',
@@ -900,6 +913,8 @@ const pl: Catalog = {
   exportNoExcelLib: 'Biblioteka Excel nie jest zainstalowana',
   true: 'Tak',
   false: 'Nie',
+  bothValues: '(oba)',
+  selectionSuffix: '(zaznaczone)',
   opContains: 'zawiera',
   opNotContains: 'nie zawiera',
   opEquals: 'równa się',
@@ -1030,6 +1045,8 @@ const ru: Catalog = {
   exportNoExcelLib: 'Библиотека Excel не установлена',
   true: 'Да',
   false: 'Нет',
+  bothValues: '(оба)',
+  selectionSuffix: '(выбранные)',
   opContains: 'содержит',
   opNotContains: 'не содержит',
   opEquals: 'равно',
