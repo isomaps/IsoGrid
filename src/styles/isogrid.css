@@ -1273,8 +1273,19 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-row-selected { background: var(--isg-accent-soft); }
 .isg-striped .isg-row-selected.isg-row-odd { background: var(--isg-accent-soft); }
 .isg-row-selected:hover { background: var(--isg-accent-soft); }
+/* Cellules épinglées d'une ligne sélectionnée : elles portent leur propre fond
+   opaque, et les règles du zébrage (.isg-striped .isg-row-odd .isg-pinned-*)
+   et du survol (.isg-row:hover .isg-pinned-*) pèsent trois classes. Une règle
+   à deux classes perdait donc une ligne sur deux (lignes impaires) et toute
+   ligne survolée : la case à cocher et la colonne d'actions restaient grises
+   alors que le reste de la ligne était bleu. Chaque variante est déclarée ici
+   avec une spécificité au moins égale, et plus bas dans la feuille. */
 .isg-row-selected .isg-pinned-start,
-.isg-row-selected .isg-pinned-end { background: var(--isg-accent-soft); }
+.isg-row-selected .isg-pinned-end,
+.isg-row-selected:hover .isg-pinned-start,
+.isg-row-selected:hover .isg-pinned-end,
+.isg-striped .isg-row-selected.isg-row-odd .isg-pinned-start,
+.isg-striped .isg-row-selected.isg-row-odd .isg-pinned-end { background: var(--isg-accent-soft); }
 
 /* Liseré à gauche : la sélection reste lisible même quand la ligne épinglée
    défile sous les colonnes du centre. */
