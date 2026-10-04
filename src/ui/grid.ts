@@ -156,6 +156,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private sectionNodes = new Map<number, HTMLElement>()
   /** Signature des filtres pour lesquels `sections` a ete obtenu. */
   private sectionsSignature: string | null = null
+  /** L'ouverture par defaut des groupes serveur a deja ete semee. */
+  private serverExpandedSeeded = false
 
   /* --- persistance de l'état côté hôte --- */
   /** Vrai tant que l'état persisté n'est pas arrivé : rien n'est encore chargé. */
@@ -212,6 +214,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         // la grille restait vide au rechargement (24/09/2026).
         this.serverGroup = initialGroups[initialGroups.length - 1] ?? null
         this.serverExpanded = new Set(options.initialState?.expandedGroups ?? [])
+        this.serverExpandedSeeded = (options.initialState?.expandedGroups ?? []).length > 0
       }
     }
     const groupes = this.serverGroup !== null ? [this.serverGroup] : this.grouping.getGroupBy()
@@ -870,6 +873,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (suivant === this.serverGroup) return
       this.serverGroup = suivant
       this.serverExpanded.clear()
+      this.serverExpandedSeeded = false
       this.serverPlan = null
       // Même présentation que le groupage client : une colonne d'arborescence
       // en tête (chevron, valeur, effectif), la colonne groupée masquée.
@@ -1233,6 +1237,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (this.destroyed) return
       this.sectionsSignature = signature
       this.sections = Array.isArray(sections) ? sections : []
+      if (this.serverGroup !== null && !this.serverExpandedSeeded) {
+        // `groupDefaultExpanded: -1` vaut aussi en groupage serveur : les
+        // groupes ne sont connus qu'ici, a l'arrivee des sections — au
+        // montage, l'ensemble a ouvrir n'existait pas encore. Seme une seule
+        // fois : un rechargement ne rouvre pas ce que l'utilisateur a replie.
+        this.serverExpandedSeeded = true
+        if (this.options.groupDefaultExpanded === -1) {
+          this.serverExpanded = new Set(this.sections.map(s => String(s.value)))
+        }
+      }
       if (this.serverGroup !== null) {
         this.rebuildServerPlan()
         this.render()
