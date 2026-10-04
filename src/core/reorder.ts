@@ -71,6 +71,13 @@ export interface RowReorderOptions<TRow = AnyRow> {
   onGroupMove?: (event: GroupMoveEvent) => void | Promise<void>
   /** La ligne peut-elle être saisie ? `false` masque sa poignée. */
   canDrag?: (row: TRow) => boolean
+  /**
+   * La colonne métier qui PORTE l'ordre des lignes. Un tri croissant sur
+   * cette seule colonne affiche l'ordre canonique : il ne gèle pas les
+   * poignées, contrairement à tout autre tri (décroissant compris — l'ordre
+   * affiché serait l'inverse de l'ordre métier, et le dépôt mentirait).
+   */
+  orderColumn?: string
   /** Largeur de la colonne poignée. Défaut : 36. */
   width?: number
 }

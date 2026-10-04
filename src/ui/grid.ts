@@ -1886,9 +1886,15 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   /* Glisser-déposer de lignes (rowReorder)                                 */
   /* -------------------------------------------------------------------- */
 
-  /** Pendant un tri, l'ordre affiché n'est plus l'ordre métier : on gèle tout. */
+  /** Pendant un tri, l'ordre affiché n'est plus l'ordre métier : on gèle tout.
+      Exception : le tri CROISSANT sur la colonne d'ordre elle-même
+      (`orderColumn`) — c'est l'ordre canonique, le dépôt y reste vrai. */
   private reorderLocked(): boolean {
-    return this.columnModel.getState().sort.length > 0
+    const sort = this.columnModel.getState().sort
+    if (sort.length === 0) return false
+    const opts = this.options.rowReorder
+    if (!opts || !opts.orderColumn) return true
+    return !(sort.length === 1 && sort[0]!.id === opts.orderColumn && !sort[0]!.desc)
   }
 
   /**
