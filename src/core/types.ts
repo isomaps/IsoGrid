@@ -899,6 +899,16 @@ export interface IsoGridOptions<TRow = AnyRow> {
    */
   rowReorder?: false | import('./reorder').RowReorderOptions<TRow>
 
+  /**
+   * Menu « ⋯ » sur les lignes de GROUPE : renommer, dissoudre, exporter un
+   * groupe — ce que l'hôte veut. Retourner `[]` masque le bouton du groupe.
+   * `key` est la valeur BRUTE du groupe (celle de `getSections().value` en
+   * mode serveur), `label` son libellé affiché.
+   */
+  groupActions?: {
+    items: (group: { key: unknown; label: string; count: number; columnId: string }) => ContextMenuItem[]
+  }
+
   /** Remontée d'erreur de chargement. Défaut : log console + bandeau. */
   onError?: (error: unknown) => void
 

@@ -1747,6 +1747,21 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           text: this.formatGroupKey(group.columnId, group.key),
         }))
         cell.append(el('span', { class: `${NS}-group-count`, text: `(${this.t.number(group.count)})` }))
+        if (this.options.groupActions) {
+          const items = this.options.groupActions.items({
+            key: this.groupKeyAt(index),
+            label: String(group.key ?? ''),
+            count: group.count,
+            columnId: group.columnId,
+          })
+          // Le bouton « ⋯ » des lignes : même menu, même geste — et
+          // `stopPropagation` pour ne pas replier le groupe en l'ouvrant.
+          if (items.length > 0) {
+            const btn = this.buildRowActionsButton(items)
+            btn.classList.add(`${NS}-group-actions-btn`)
+            cell.append(btn)
+          }
+        }
       } else if (column.id === DRAG_COLUMN_ID) {
         if (this.groupDraggable()) cell.append(this.buildDragHandle('dragGroup'))
       } else if (column.id === SELECTION_COLUMN_ID) {

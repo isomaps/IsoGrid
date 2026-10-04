@@ -1654,3 +1654,6 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 /* Dépôt DANS un groupe replié : tout l'en-tête s'allume, cellules épinglées
    comprises (elles ont un fond opaque, comme pour la sélection). */
 .isg-row-group.isg-drop-into .isg-cell { background: var(--isg-accent-soft); }
+
+/* Menu « ... » d'une ligne de groupe (option groupActions). */
+.isg-group-actions-btn { margin-left: 6px; flex: 0 0 auto; }
