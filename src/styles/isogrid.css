@@ -1606,3 +1606,51 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 }
 .isg-cell-agg-multi > span { flex: none; }
 .isg-cell-agg-sep { opacity: 0.45; }
+
+/* ------------------------------------------------------------------ */
+/* Glisser-déposer de lignes (rowReorder)                               */
+/* ------------------------------------------------------------------ */
+
+.isg-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  color: var(--isg-fg-muted);
+  touch-action: none;
+}
+.isg-drag-handle:hover { color: var(--isg-fg); }
+.isg-drag-handle:active { cursor: grabbing; }
+.isg-drag-handle.isg-drag-off { opacity: 0.35; cursor: default; }
+
+.isg-row.isg-dragging { opacity: 0.4; }
+.isg-row.isg-row-saving { opacity: 0.5; pointer-events: none; }
+
+/* Trait d'insertion : un seul élément, déplacé en translateY. */
+.isg-drop-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--isg-accent);
+  z-index: 5;
+  pointer-events: none;
+  display: none;
+}
+.isg-drop-line::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--isg-accent);
+}
+
+/* Dépôt DANS un groupe replié : tout l'en-tête s'allume, cellules épinglées
+   comprises (elles ont un fond opaque, comme pour la sélection). */
+.isg-row-group.isg-drop-into .isg-cell { background: var(--isg-accent-soft); }

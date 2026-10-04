@@ -6,6 +6,7 @@ import { resolveFilterConfig } from '../filters/model'
 import { DEFAULTS } from '../core/defaults'
 import { SELECTION_COLUMN_ID } from '../core/selection'
 import { GROUP_COLUMN_ID } from '../core/grouping'
+import { DRAG_COLUMN_ID } from '../core/reorder'
 
 /**
  * Rendu de l'en-tête : bandeaux de groupe, cellules de colonne, tri,
@@ -370,6 +371,7 @@ export class HeaderRenderer {
       && this.ctx.api.canRowGroup()
       && column.id !== SELECTION_COLUMN_ID
       && column.id !== GROUP_COLUMN_ID
+      && column.id !== DRAG_COLUMN_ID
     if (groupable) {
       menu.append(el('div', { class: `${NS}-menu-sep` }))
       menu.append(grouped.includes(column.id)

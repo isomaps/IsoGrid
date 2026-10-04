@@ -28,6 +28,16 @@ export class ClientDatasource<TRow = AnyRow> implements Datasource<TRow> {
     this.cacheKey = ''
   }
 
+  /**
+   * Invalide la mémoïsation SANS changer de tableau : à appeler quand les
+   * lignes ont été réordonnées ou modifiées EN PLACE (glisser-déposer). La
+   * clé de mémoïsation ne voit que tri, filtres et recherche — une mutation
+   * du tableau lui échappe, et le résultat resservi garderait l'ancien ordre.
+   */
+  touch(): void {
+    this.cacheKey = ''
+  }
+
   setColumns(columns: ColumnDef<TRow>[]): void {
     this.columns = columns
     this.cacheKey = ''

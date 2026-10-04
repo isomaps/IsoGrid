@@ -2,6 +2,7 @@ import type { GridState } from './types'
 import { SELECTION_COLUMN_ID } from './selection'
 import { GROUP_COLUMN_ID } from './grouping'
 import { DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID } from './detail'
+import { DRAG_COLUMN_ID } from './reorder'
 
 /* ------------------------------------------------------------------------ */
 /* Contrat                                                                   */
@@ -71,7 +72,7 @@ export interface SavedViewsAdapter {
 /* ------------------------------------------------------------------------ */
 
 const INTERNAL_COLUMNS = new Set([
-  SELECTION_COLUMN_ID, GROUP_COLUMN_ID, DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID,
+  SELECTION_COLUMN_ID, GROUP_COLUMN_ID, DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID, DRAG_COLUMN_ID,
 ])
 
 export function isInternalColumn(id: string): boolean {

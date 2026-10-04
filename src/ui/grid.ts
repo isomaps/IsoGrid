@@ -9,6 +9,7 @@ import {
   type SelectionSnapshot, type SelectionState,
 } from '../core/selection'
 import { GROUP_COLUMN_ID, GroupingModel, type DisplayRow } from '../core/grouping'
+import { DRAG_COLUMN_ID, type GroupMoveEvent, type RowMoveEvent } from '../core/reorder'
 
 /** Préfixe des chemins de groupes servis par la source (groupage serveur). */
 const SERVER_GROUP_PREFIX = '\u0001srv:'
@@ -41,6 +42,20 @@ import {
 } from '../core/saved-views'
 import { SavedViewsMenu, type SavedViewsController } from './saved-views'
 
+
+/* --- glisser-déposer de lignes : états internes --- */
+interface RowDragState<TRow> { kind: 'row'; row: TRow; rowId: string; index: number; node: HTMLElement }
+interface GroupDragState { kind: 'group'; key: unknown; columnId: string; index: number; node: HTMLElement }
+interface RowDropTarget<TRow> {
+  kind: 'row'
+  slot: number
+  before: TRow | null
+  after: TRow | null
+  groupKey: unknown
+  /** Dépôt DANS un groupe replié (en queue) : on surligne sa ligne au lieu de tracer un trait. */
+  intoCollapsed: boolean
+}
+interface GroupDropTarget { kind: 'group'; beforeKey: unknown; afterKey: unknown; offset: number }
 
 export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private options: IsoGridOptions<TRow>
@@ -102,6 +117,18 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private rowActionsMenu!: ContextMenu
   /** Horodatage du dernier appui long : voir l'écoute de `contextmenu`. */
   private dernierAppuiLong = 0
+
+  /* --- glisser-déposer de lignes --- */
+  /** Geste en cours, posé au dragstart : `dataTransfer` est illisible pendant le survol. */
+  private dragging: RowDragState<TRow> | GroupDragState | null = null
+  /** Destination du survol courant, calculée par `onDragOver`, consommée par `onDrop`. */
+  private dropTarget: RowDropTarget<TRow> | GroupDropTarget | null = null
+  /** Trait d'insertion, unique et recyclé — jamais un par ligne. */
+  private dropLine?: HTMLElement
+  /** Ligne de groupe surlignée pour un dépôt « dans le groupe replié ». */
+  private dropIntoNode: HTMLElement | null = null
+  /** Un déplacement attend la réponse de l'hôte : aucun autre ne démarre. */
+  private movePending = false
 
   /* --- état de rendu --- */
   private renderedRows = new Map<number, HTMLElement>()
@@ -191,6 +218,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
     this.columnModel = new ColumnModel({
       columns: options.columns as ColumnDef[],
+      dragColumn: options.rowReorder
+        ? { width: options.rowReorder.width ?? DEFAULTS.dragColumnWidth }
+        : false,
       selectionColumn: options.rowSelection === 'multiple' && options.selectionColumn !== false
         ? { width: options.selectionColumnWidth ?? DEFAULTS.selectionColumnWidth }
         : false,
@@ -533,6 +563,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       children: enfantsViewport,
     })
     this.viewport.addEventListener('scroll', () => this.onScroll(), { passive: true })
+    if (this.options.rowReorder) this.wireRowDrop()
 
     const main = el('div', {
       class: `${NS}-main`,
@@ -1517,6 +1548,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (this.options.onRowDoubleClick) {
         node.addEventListener('dblclick', e => this.options.onRowDoubleClick!(row, index, e))
       }
+      if (this.options.rowReorder) {
+        // `dragstart` ne part que si la poignée a posé `draggable` à l'instant
+        // du geste : le texte des cellules reste sélectionnable à la souris.
+        node.addEventListener('dragstart', (e: DragEvent) => this.onRowDragStart(e, row, index, node))
+        node.addEventListener('dragend', () => this.onDragEnd(node))
+      }
     }
     return node
   }
@@ -1545,6 +1582,12 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       cell.style.zIndex = '2'
       if (column.pinned === 'start') cell.style.left = `${column.stickyOffset}px`
       else cell.style.right = `${column.stickyOffset}px`
+    }
+
+    if (column.id === DRAG_COLUMN_ID) {
+      const opts = this.options.rowReorder
+      if (row && opts && (opts.canDrag?.(row) ?? true)) cell.append(this.buildDragHandle('dragRow'))
+      return cell
     }
 
     if (column.id === SELECTION_COLUMN_ID) {
@@ -1690,6 +1733,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           text: this.formatGroupKey(group.columnId, group.key),
         }))
         cell.append(el('span', { class: `${NS}-group-count`, text: `(${this.t.number(group.count)})` }))
+      } else if (column.id === DRAG_COLUMN_ID) {
+        if (this.groupDraggable()) cell.append(this.buildDragHandle('dragGroup'))
       } else if (column.id === SELECTION_COLUMN_ID) {
         // Un groupe serveur ne connaît pas ses lignes tant qu'il est replié :
         // une case « tout le groupe » mentirait.
@@ -1730,6 +1775,11 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if ((e.target as HTMLElement).closest('input')) return
       this.toggleGroup(group.path)
     })
+
+    if (this.groupDraggable()) {
+      row.addEventListener('dragstart', (e: DragEvent) => this.onGroupDragStart(e, index, row))
+      row.addEventListener('dragend', () => this.onDragEnd(row))
+    }
 
     return row
   }
@@ -1816,6 +1866,357 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       return this.t.number(value, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     }
     return String(value ?? '')
+  }
+
+  /* -------------------------------------------------------------------- */
+  /* Glisser-déposer de lignes (rowReorder)                                 */
+  /* -------------------------------------------------------------------- */
+
+  /** Pendant un tri, l'ordre affiché n'est plus l'ordre métier : on gèle tout. */
+  private reorderLocked(): boolean {
+    return this.columnModel.getState().sort.length > 0
+  }
+
+  /**
+   * Les lignes de groupe sont-elles déplaçables ?
+   *
+   * Un seul niveau de groupage : réordonner un sous-groupe exigerait de dire
+   * DANS quel parent, ce que le geste ne sait pas exprimer clairement.
+   */
+  private groupDraggable(): boolean {
+    const opts = this.options.rowReorder
+    if (!opts || !opts.onGroupMove || this.reorderLocked()) return false
+    if (this.serverPlan) return true
+    return this.grouping.isActive() && this.grouping.getGroupBy().length === 1
+  }
+
+  /**
+   * La poignée. Elle pose `draggable` sur SA ligne le temps du geste — le
+   * schéma du panneau Colonnes : en permanence, le drag natif avalerait la
+   * sélection de texte des cellules.
+   */
+  private buildDragHandle(aria: 'dragRow' | 'dragGroup'): HTMLElement {
+    const verrouille = this.reorderLocked()
+    const handle = el('span', {
+      class: `${NS}-drag-handle${verrouille ? ` ${NS}-drag-off` : ''}`,
+      attrs: {
+        'aria-label': this.t.t(aria),
+        ...(verrouille ? { 'data-isg-tip': this.t.t('dragDisabledSorted') } : {}),
+      },
+      children: [renderIcon('grip', this.options.renderIcon)],
+    })
+    if (!verrouille) {
+      handle.addEventListener('pointerdown', () => {
+        if (this.movePending) return
+        const ligne = handle.closest(`.${NS}-row`) as HTMLElement | null
+        if (!ligne) return
+        ligne.draggable = true
+        const fin = (): void => { ligne.draggable = false }
+        ligne.addEventListener('dragend', fin, { once: true })
+        handle.addEventListener('pointerup', fin, { once: true })
+      })
+    }
+    return handle
+  }
+
+  private onRowDragStart(e: DragEvent, row: TRow, index: number, node: HTMLElement): void {
+    if (!node.draggable || this.movePending || this.reorderLocked()) { e.preventDefault(); return }
+    this.dragging = { kind: 'row', row, rowId: this.rowId(row, index), index, node }
+    this.dropTarget = null
+    node.classList.add(`${NS}-dragging`)
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move'
+      // Nécessaire pour que Firefox démarre le geste ; MIME dédié pour que
+      // rien d'autre (panneau de groupage, autre grille) ne croie le comprendre.
+      e.dataTransfer.setData('application/x-isogrid-row', this.dragging.rowId)
+    }
+  }
+
+  private onGroupDragStart(e: DragEvent, index: number, node: HTMLElement): void {
+    if (!node.draggable || this.movePending) { e.preventDefault(); return }
+    const columnId = this.serverGroup ?? this.grouping.getGroupBy()[0]
+    if (columnId == null) { e.preventDefault(); return }
+    this.dragging = { kind: 'group', key: this.groupKeyAt(index), columnId, index, node }
+    this.dropTarget = null
+    node.classList.add(`${NS}-dragging`)
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('application/x-isogrid-group', String(this.dragging.key ?? ''))
+    }
+  }
+
+  private onDragEnd(node: HTMLElement): void {
+    node.classList.remove(`${NS}-dragging`)
+    node.draggable = false
+    this.dragging = null
+    this.dropTarget = null
+    this.clearDropIndicator()
+  }
+
+  private wireRowDrop(): void {
+    const vp = this.viewport
+    vp.addEventListener('dragover', (e) => this.onDragOver(e))
+    vp.addEventListener('drop', (e) => this.onDrop(e))
+    vp.addEventListener('dragleave', (e) => {
+      // `dragleave` part aussi en survolant un enfant : on ne réagit qu'en
+      // quittant réellement la fenêtre de la grille.
+      if (vp.contains(e.relatedTarget as Node)) return
+      this.clearDropIndicator()
+      this.dropTarget = null
+    })
+  }
+
+  private onDragOver(e: DragEvent): void {
+    const drag = this.dragging
+    if (!drag) return
+    e.preventDefault()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+
+    const total = this.totalRowCount()
+    if (total === 0) { this.clearDropIndicator(); this.dropTarget = null; return }
+    const y = e.clientY - this.bodyEl.getBoundingClientRect().top
+
+    if (drag.kind === 'group') {
+      const cible = this.computeGroupTarget(y, drag)
+      this.dropTarget = cible
+      if (!cible) { this.clearDropIndicator(); return }
+      this.showDropLine(cible.offset)
+      return
+    }
+
+    const index = Math.max(0, Math.min(this.detailLayout.indexAt(Math.max(0, y), total), total - 1))
+    const slot = y < this.detailLayout.offsetOf(index) + this.rowHeight() / 2 ? index : index + 1
+    const cible = this.computeRowTarget(slot, drag)
+    this.dropTarget = cible
+    if (!cible) { this.clearDropIndicator(); return }
+    if (cible.intoCollapsed) this.showDropInto(cible.slot - 1)
+    else {
+      this.showDropLine(cible.slot >= total
+        ? this.detailLayout.totalHeight(total)
+        : this.detailLayout.offsetOf(cible.slot))
+    }
+  }
+
+  private onDrop(e: DragEvent): void {
+    const drag = this.dragging
+    const cible = this.dropTarget
+    this.clearDropIndicator()
+    this.dropTarget = null
+    if (!drag || !cible) return
+    e.preventDefault()
+    if (drag.kind === 'row' && cible.kind === 'row') void this.commitRowMove(drag, cible)
+    else if (drag.kind === 'group' && cible.kind === 'group') void this.commitGroupMove(drag, cible)
+  }
+
+  /** Valeur brute du groupe auquel appartient l'index d'affichage donné. */
+  private groupKeyAt(index: number): unknown {
+    if (this.serverPlan) return this.sections[this.serverGroupAt(index)]?.value ?? null
+    if (this.grouping.isActive()) return this.grouping.groupAt(index)?.key ?? null
+    return null
+  }
+
+  /**
+   * Décrit le dépôt d'une ligne à la position `slot` (entre deux lignes
+   * d'affichage). `null` : dépôt sans signification — au-dessus du premier
+   * groupe, contre une voisine pas encore chargée, ou sur la ligne traînée.
+   */
+  private computeRowTarget(slot: number, drag: RowDragState<TRow>): RowDropTarget<TRow> | null {
+    const total = this.totalRowCount()
+    slot = Math.max(0, Math.min(slot, total))
+    const grouped = this.serverPlan !== null || this.grouping.isActive()
+    const prev = slot > 0 ? this.displayRow(slot - 1) : undefined
+    const next = slot < total ? this.displayRow(slot) : undefined
+
+    let before: TRow | null = null
+    let after: TRow | null = null
+    let groupKey: unknown = null
+    let intoCollapsed = false
+
+    if (!grouped) {
+      // Une voisine pas chargée (squelette) ne peut pas servir de repère.
+      if (slot > 0 && !prev) return null
+      before = prev?.kind === 'leaf' ? prev.row : null
+      after = next?.kind === 'leaf' ? next.row : null
+    } else {
+      // En groupage, toute position est DANS un groupe : au-dessus du premier
+      // en-tête, il n'y a nulle part où poser la ligne.
+      if (slot === 0 || !prev) return null
+      groupKey = this.groupKeyAt(slot - 1)
+      if (prev.kind === 'group') {
+        if (!prev.expanded) intoCollapsed = true
+        else after = next?.kind === 'leaf' ? next.row : null
+      } else {
+        before = prev.row
+        after = next?.kind === 'leaf' ? next.row : null
+      }
+    }
+
+    // La ligne reposée à sa place : rien à signaler, rien à enregistrer.
+    if (before === drag.row || after === drag.row) {
+      const fromKey = grouped ? this.groupKeyAt(drag.index) : null
+      if (!grouped || groupKey === fromKey) return null
+    }
+
+    return { kind: 'row', slot, before, after, groupKey, intoCollapsed }
+  }
+
+  /** En-têtes de groupe affichés : index d'affichage et valeur brute. */
+  private groupHeaders(): { index: number; key: unknown }[] {
+    const out: { index: number; key: unknown }[] = []
+    if (this.serverPlan) {
+      this.serverPlan.display.forEach((d, i) => out.push({ index: d, key: this.sections[i]?.value ?? null }))
+      return out
+    }
+    const n = this.grouping.getDisplayRowCount()
+    for (let i = 0; i < n; i++) {
+      const d = this.grouping.getDisplayRow(i)
+      if (d?.kind === 'group') out.push({ index: i, key: d.node.key })
+    }
+    return out
+  }
+
+  /** Décrit le dépôt d'un GROUPE : la frontière de groupes la plus proche du curseur. */
+  private computeGroupTarget(y: number, drag: GroupDragState): GroupDropTarget | null {
+    const headers = this.groupHeaders()
+    if (headers.length < 2) return null
+    const bornes = headers.map(h => this.detailLayout.offsetOf(h.index))
+    bornes.push(this.detailLayout.totalHeight(this.totalRowCount()))
+
+    let at = 0
+    let best = Number.POSITIVE_INFINITY
+    bornes.forEach((b, i) => {
+      const d = Math.abs(y - b)
+      if (d < best) { best = d; at = i }
+    })
+
+    const beforeKey = at > 0 ? headers[at - 1]!.key : null
+    const afterKey = at < headers.length ? headers[at]!.key : null
+    // Reposer le groupe contre lui-même : rien à faire.
+    if (beforeKey === drag.key || afterKey === drag.key) return null
+    return { kind: 'group', beforeKey, afterKey, offset: bornes[at]! }
+  }
+
+  private showDropLine(offset: number): void {
+    this.clearDropInto()
+    this.dropLine ??= el('div', { class: `${NS}-drop-line` })
+    // `replaceChildren()` du corps l'évince : on le repose à la demande.
+    if (!this.dropLine.parentElement) this.bodyEl.append(this.dropLine)
+    this.dropLine.style.transform = `translateY(${offset}px)`
+    this.dropLine.style.display = 'block'
+  }
+
+  private hideDropLine(): void {
+    if (this.dropLine) this.dropLine.style.display = 'none'
+  }
+
+  private showDropInto(headerIndex: number): void {
+    this.hideDropLine()
+    const node = this.renderedRows.get(headerIndex) ?? null
+    if (node === this.dropIntoNode) return
+    this.clearDropInto()
+    if (node) { node.classList.add(`${NS}-drop-into`); this.dropIntoNode = node }
+  }
+
+  private clearDropInto(): void {
+    this.dropIntoNode?.classList.remove(`${NS}-drop-into`)
+    this.dropIntoNode = null
+  }
+
+  private clearDropIndicator(): void {
+    this.hideDropLine()
+    this.clearDropInto()
+  }
+
+  private async commitRowMove(drag: RowDragState<TRow>, cible: RowDropTarget<TRow>): Promise<void> {
+    const opts = this.options.rowReorder
+    if (!opts) return
+    const grouped = this.serverPlan !== null || this.grouping.isActive()
+    const evenement: RowMoveEvent<TRow> = {
+      row: drag.row,
+      rowId: drag.rowId,
+      before: cible.before,
+      after: cible.after,
+      groupKey: cible.groupKey,
+      fromGroupKey: grouped ? this.groupKeyAt(drag.index) : null,
+      groupColumnId: this.serverGroup
+        ?? (this.grouping.isActive() ? this.grouping.getGroupBy()[0] ?? null : null),
+    }
+    try {
+      const retour = opts.onRowMove(evenement)
+      if (retour instanceof Promise) {
+        this.movePending = true
+        drag.node.classList.add(`${NS}-row-saving`)
+        await retour
+      }
+      // L'hôte a persisté : on relit les données, défilement conservé —
+      // `reload()` ramènerait en haut à chaque geste.
+      this.softReload()
+    } catch (err) {
+      /* Le refus de l'hôte est un message métier : on l'affiche, la grille
+         n'a rien changé — les lignes sont restées à leur place. */
+      const message = err instanceof Error ? err.message : String(err)
+      this.toastHost.show(message, { kind: 'error' })
+      this.options.onError?.(err)
+    } finally {
+      this.movePending = false
+      drag.node.classList.remove(`${NS}-row-saving`)
+    }
+  }
+
+  private async commitGroupMove(drag: GroupDragState, cible: GroupDropTarget): Promise<void> {
+    const opts = this.options.rowReorder
+    if (!opts || !opts.onGroupMove) return
+    const evenement: GroupMoveEvent = {
+      key: drag.key,
+      beforeKey: cible.beforeKey,
+      afterKey: cible.afterKey,
+      columnId: drag.columnId,
+    }
+    try {
+      const retour = opts.onGroupMove(evenement)
+      if (retour instanceof Promise) {
+        this.movePending = true
+        drag.node.classList.add(`${NS}-row-saving`)
+        await retour
+      }
+      this.softReload()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.toastHost.show(message, { kind: 'error' })
+      this.options.onError?.(err)
+    } finally {
+      this.movePending = false
+      drag.node.classList.remove(`${NS}-row-saving`)
+    }
+  }
+
+  /**
+   * Recharge les données SANS perdre la position de défilement.
+   *
+   * C'est le pendant de `reload()` pour les gestes « sur place » : après un
+   * déplacement de ligne, revenir en haut ferait perdre l'endroit même qu'on
+   * vient de manipuler. Les sections sont redemandées (les effectifs des
+   * groupes ont pu changer) mais les ANCIENNES restent affichées en
+   * attendant : mieux vaut un effectif périmé une fraction de seconde qu'un
+   * corps qui se replie puis se redéploie.
+   */
+  private softReload(): void {
+    const scroll = this.viewport.scrollTop
+    this.lastError = null
+    this.clientSource?.touch()
+    this.cache.invalidate()
+    this.cache.requestContext = this.buildRequestContext()
+    this.sectionsSignature = null
+    this.renderedRows.clear()
+    this.sectionNodes.clear()
+    this.bodyEl.replaceChildren()
+    this.rebuildGroups()
+    this.refreshVisibleRange()
+    this.renderStatus()
+    this.renderFooter()
+    this.renderOverlay()
+    if (this.sectionsConfig()) void this.fetchSections()
+    this.viewport.scrollTop = scroll
   }
 
   /** Bouton « ⋮ » ouvrant le menu d'actions de la ligne. */

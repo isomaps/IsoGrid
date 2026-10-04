@@ -885,6 +885,20 @@ export interface IsoGridOptions<TRow = AnyRow> {
    */
   onCellValueChanged?: (event: import('./editing').CellEditEvent<TRow>) => void | Promise<void>
 
+  /**
+   * Réorganisation des lignes au glisser-déposer : une colonne poignée
+   * apparaît en tête, et chaque dépôt est remis à l'hôte (`onRowMove`), qui
+   * persiste le nouvel ordre — ou le refuse en rejetant sa promesse. Avec un
+   * groupage actif, une ligne se dépose aussi dans un autre groupe, et
+   * `onGroupMove` (optionnel) rend les lignes de groupe déplaçables.
+   *
+   * La grille ne réordonne rien elle-même : après résolution, elle recharge
+   * ses données en conservant le défilement. Les poignées se désactivent
+   * pendant un tri — l'ordre affiché n'est alors plus l'ordre métier, et un
+   * dépôt n'aurait pas de sens.
+   */
+  rowReorder?: false | import('./reorder').RowReorderOptions<TRow>
+
   /** Remontée d'erreur de chargement. Défaut : log console + bandeau. */
   onError?: (error: unknown) => void
 

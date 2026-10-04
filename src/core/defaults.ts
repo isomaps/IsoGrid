@@ -16,6 +16,7 @@ export const DEFAULTS = {
   detailColumnWidth: 40,
   detailProvisionalHeight: 120,
   rowActionsWidth: 48,
+  dragColumnWidth: 36,
   /** Lignes rendues en surplus au-dessus et au-dessous de la fenêtre visible. */
   overscan: 6,
   /** Regroupement des enregistrements d'état, en ms. */

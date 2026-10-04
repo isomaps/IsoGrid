@@ -144,6 +144,23 @@ function build(mode: 'server' | 'client') {
         action: () => console.debug('[demo] annuler', row.number) },
     ],
   },
+  // Démo du glisser-déposer : l'« hôte » réordonne son tableau (avec une
+  // latence simulée), la grille recharge en gardant le défilement.
+  rowReorder: {
+    onRowMove: (e) => new Promise<void>((resolve) => setTimeout(() => {
+      const from = rows.indexOf(e.row)
+      if (from >= 0) {
+        rows.splice(from, 1)
+        const at = e.before
+          ? rows.indexOf(e.before) + 1
+          : e.after ? rows.indexOf(e.after) : rows.length
+        rows.splice(Math.max(0, at), 0, e.row)
+      }
+      console.debug('[demo] ligne déplacée', e)
+      resolve()
+    }, 300)),
+    onGroupMove: (e) => { console.debug('[demo] groupe déplacé', e) },
+  },
   getRowId: (row) => String(row.id),
   onSelectionChanged: (sel) => {
     const el = document.querySelector('#selection-readout')

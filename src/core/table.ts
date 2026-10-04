@@ -16,6 +16,7 @@ import type { AnyRow, ColumnDef, GridState, PinPosition, SortModel } from './typ
 import { SELECTION_COLUMN_ID } from './selection'
 import { GROUP_COLUMN_ID } from './grouping'
 import { DETAIL_COLUMN_ID, ROW_ACTIONS_COLUMN_ID } from './detail'
+import { DRAG_COLUMN_ID } from './reorder'
 
 /**
  * Câblage de @tanstack/table-core.
@@ -68,6 +69,8 @@ export interface ColumnModelOptions {
   columns: ColumnDef[]
   /** Ajoute la colonne de cases à cocher en tête, épinglée et verrouillée. */
   selectionColumn?: { width: number } | false
+  /** Ajoute la colonne poignée du glisser-déposer, tout à gauche. */
+  dragColumn?: { width: number } | false
   /** Ajoute la colonne d'arborescence des groupes. */
   groupColumn?: { width: number } | false
   /** Ajoute la colonne de chevron des lignes de détail. */
@@ -209,6 +212,28 @@ export class ColumnModel {
     }
   }
 
+  /** Définition synthétique de la colonne poignée du glisser-déposer. */
+  private dragDef(): ColumnDef | null {
+    const cfg = this.opts.dragColumn
+    if (!cfg) return null
+    return {
+      id: DRAG_COLUMN_ID,
+      header: '',
+      label: 'dragColumn',
+      width: cfg.width,
+      minWidth: cfg.width,
+      maxWidth: cfg.width,
+      pinned: 'start',
+      sortable: false,
+      resizable: false,
+      filter: false,
+      lockVisible: true,
+      lockPosition: true,
+      align: 'center',
+      excludeFromExport: true,
+    }
+  }
+
   /** Définition synthétique de la colonne de sélection. */
   private selectionDef(): ColumnDef | null {
     const cfg = this.opts.selectionColumn
@@ -243,6 +268,23 @@ export class ColumnModel {
     let bucket: unknown[] | null = null
 
     const actions = this.actionsDef()
+
+    const drag = this.dragDef()
+    if (drag) {
+      out.push({
+        id: drag.id,
+        accessorKey: drag.id,
+        header: '',
+        size: drag.width,
+        minSize: drag.minWidth,
+        maxSize: drag.maxWidth,
+        enableSorting: false,
+        enableResizing: false,
+        enableHiding: false,
+        enablePinning: true,
+        filterFn: 'delegated' as const,
+      })
+    }
 
     const detail = this.detailDef()
     if (detail) {
@@ -351,6 +393,8 @@ export class ColumnModel {
     const pinEnd: string[] = []
     const sizing: Record<string, number> = {}
 
+    const drag = this.dragDef()
+    if (drag) pinStart.push(drag.id)
     const selection = this.selectionDef()
     if (selection) pinStart.push(selection.id)
     const group = this.groupDef()
@@ -395,6 +439,12 @@ export class ColumnModel {
       restoredPinning.start = [...restoredPinning.start, detail.id]
     }
 
+    // La poignée vit TOUT À GAUCHE, avant même la sélection : c'est elle
+    // qu'on saisit, elle ne doit jamais se retrouver au milieu des cases.
+    if (drag && !restoredPinning.start.includes(drag.id)) {
+      restoredPinning.start = [drag.id, ...restoredPinning.start]
+    }
+
     const startPins = restoredPinning.start
     if (group && !startPins.includes(group.id)) {
       restoredPinning.start = selection && startPins[0] === selection.id
@@ -415,6 +465,8 @@ export class ColumnModel {
   private build(): TableInstance {
     const actions = this.actionsDef()
     if (actions) this.defs.set(actions.id, actions)
+    const drag = this.dragDef()
+    if (drag) this.defs.set(drag.id, drag)
     const detail = this.detailDef()
     if (detail) this.defs.set(detail.id, detail)
     const group = this.groupDef()

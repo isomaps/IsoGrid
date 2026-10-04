@@ -311,6 +311,20 @@ export class GroupingModel<TRow extends AnyRow = AnyRow> {
     return this.flat[index]
   }
 
+  /**
+   * Le groupe le plus proche AU-DESSUS d'un index d'affichage — celui auquel
+   * la ligne de cet index appartient. Parcours arrière borné par la
+   * profondeur des groupes, jamais coûteux en pratique : le groupage client
+   * travaille sur un jeu déjà en mémoire.
+   */
+  groupAt(index: number): GroupNode<TRow> | null {
+    for (let i = Math.min(index, this.flat.length - 1); i >= 0; i--) {
+      const d = this.flat[i]
+      if (d?.kind === 'group') return d.node
+    }
+    return null
+  }
+
   /** Feuilles visibles, dans l'ordre d'affichage — pour l'export et la copie. */
   getVisibleLeaves(): TRow[] {
     return this.flat
