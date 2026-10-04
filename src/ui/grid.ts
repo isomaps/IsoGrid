@@ -3045,6 +3045,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       this.sectionStarts.clear()
       this.sectionsSignature = null
       this.serverPlan = null
+      // Les sections repartent de zero : l'ouverture par defaut se ressemera
+      // a leur arrivee (voir fetchSections) — sans quoi, apres un changement
+      // de piece hote, les groupes du nouveau jeu arrivaient tous replies.
+      this.serverExpandedSeeded = false
     }
     this.lastError = null
     this.cache.invalidate()
