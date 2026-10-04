@@ -1657,3 +1657,16 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 
 /* Menu « ... » d'une ligne de groupe (option groupActions). */
 .isg-group-actions-btn { margin-left: 6px; flex: 0 0 auto; }
+
+/* Voile d'attente d'un deplacement (rowReorder) : pose sur la fenetre de la
+   grille le temps que l'hote persiste — quelques secondes, pas instantane. */
+.isg-move-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(127, 127, 127, 0.12);
+  backdrop-filter: blur(1px);
+}

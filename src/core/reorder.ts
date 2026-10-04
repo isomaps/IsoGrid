@@ -43,7 +43,8 @@ export interface RowMoveEvent<TRow = AnyRow> {
   groupColumnId: string | null
 }
 
-/** Une ligne de groupe a été déposée entre deux autres groupes. */
+/** Une ligne de groupe a été déposée entre deux autres groupes — ou SUR un
+    autre groupe (`intoKey`), pour les hôtes dont les groupes s'emboîtent. */
 export interface GroupMoveEvent {
   /** Valeur du groupe déplacé. */
   key: unknown
@@ -51,6 +52,12 @@ export interface GroupMoveEvent {
   beforeKey: unknown
   /** Valeur du groupe qui le suivra — `null` : en queue. */
   afterKey: unknown
+  /**
+   * Le groupe a été déposé SUR la barre d'un autre (tiers central de sa
+   * hauteur) : sa valeur — l'hôte en fait un parent, ou refuse. `null` pour
+   * un dépôt entre deux barres. `beforeKey`/`afterKey` sont alors `null`.
+   */
+  intoKey?: unknown
   /** Colonne de groupage en vigueur. */
   columnId: string
 }

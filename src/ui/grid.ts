@@ -55,7 +55,16 @@ interface RowDropTarget<TRow> {
   /** Dépôt DANS un groupe replié (en queue) : on surligne sa ligne au lieu de tracer un trait. */
   intoCollapsed: boolean
 }
-interface GroupDropTarget { kind: 'group'; beforeKey: unknown; afterKey: unknown; offset: number }
+interface GroupDropTarget {
+  kind: 'group'
+  beforeKey: unknown
+  afterKey: unknown
+  /** Dépôt SUR la barre d'un autre groupe (tiers central) : sa clé. */
+  intoKey: unknown
+  /** Index d'affichage de la barre visée (surlignage), -1 pour un trait. */
+  headerIndex: number
+  offset: number
+}
 
 export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private options: IsoGridOptions<TRow>
@@ -127,6 +136,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private dropLine?: HTMLElement
   /** Ligne de groupe surlignée pour un dépôt « dans le groupe replié ». */
   private dropIntoNode: HTMLElement | null = null
+  /** Voile d'attente pendant qu'un déplacement attend l'hôte. */
+  private moveVeil: HTMLElement | null = null
   /** Un déplacement attend la réponse de l'hôte : aucun autre ne démarre. */
   private movePending = false
 
@@ -837,7 +848,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           path: SERVER_GROUP_PREFIX + String(section.value),
           key: section.label ?? section.value,
           columnId: this.serverGroup!,
-          level: 0,
+          level: section.level ?? 0,
           count: section.count,
           aggregates: (section.totals ?? {}) as Record<string, unknown>,
           children: [],
@@ -846,7 +857,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       }
     }
     const row = this.cache.getRow(this.serverSourceIndex(index)!)
-    return row ? { kind: 'leaf', row, level: 1 } : undefined
+    return row ? { kind: 'leaf', row, level: (section.level ?? 0) + 1 } : undefined
   }
 
   private displayRow(index: number): DisplayRow<TRow> | undefined {
@@ -2015,7 +2026,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       const cible = this.computeGroupTarget(y, drag)
       this.dropTarget = cible
       if (!cible) { this.clearDropIndicator(); return }
-      this.showDropLine(cible.offset)
+      if (cible.intoKey != null) this.showDropInto(cible.headerIndex)
+      else this.showDropLine(cible.offset)
       return
     }
 
@@ -2110,10 +2122,31 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return out
   }
 
-  /** Décrit le dépôt d'un GROUPE : la frontière de groupes la plus proche du curseur. */
+  /**
+   * Décrit le dépôt d'un GROUPE : la frontière la plus proche du curseur —
+   * ou, quand le curseur est dans le TIERS CENTRAL de la barre d'un autre
+   * groupe, un dépôt « dans » ce groupe (`intoKey`), pour les hôtes dont les
+   * groupes s'emboîtent.
+   */
   private computeGroupTarget(y: number, drag: GroupDragState): GroupDropTarget | null {
     const headers = this.groupHeaders()
     if (headers.length < 2) return null
+    const rowHeight = this.rowHeight()
+
+    // Dépôt SUR une barre : le tiers central de sa hauteur, pour laisser les
+    // bords aux insertions avant/après.
+    if (this.options.rowReorder && this.options.rowReorder.onGroupMove) {
+      for (const h of headers) {
+        const top = this.detailLayout.offsetOf(h.index)
+        if (y < top + rowHeight / 3 || y > top + rowHeight * 2 / 3) continue
+        if (h.key === drag.key) return null
+        return {
+          kind: 'group', beforeKey: null, afterKey: null,
+          intoKey: h.key, headerIndex: h.index, offset: top,
+        }
+      }
+    }
+
     const bornes = headers.map(h => this.detailLayout.offsetOf(h.index))
     bornes.push(this.detailLayout.totalHeight(this.totalRowCount()))
 
@@ -2128,7 +2161,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const afterKey = at < headers.length ? headers[at]!.key : null
     // Reposer le groupe contre lui-même : rien à faire.
     if (beforeKey === drag.key || afterKey === drag.key) return null
-    return { kind: 'group', beforeKey, afterKey, offset: bornes[at]! }
+    return { kind: 'group', beforeKey, afterKey, intoKey: null, headerIndex: -1, offset: bornes[at]! }
   }
 
   private showDropLine(offset: number): void {
@@ -2181,6 +2214,9 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (retour instanceof Promise) {
         this.movePending = true
         drag.node.classList.add(`${NS}-row-saving`)
+        // Persister puis recharger prend quelques secondes : sans voile,
+        // l'écran semble ignorer le geste et on relâche une deuxième fois.
+        this.showMoveVeil()
         await retour
       }
       // L'hôte a persisté : on relit les données, défilement conservé —
@@ -2195,6 +2231,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     } finally {
       this.movePending = false
       drag.node.classList.remove(`${NS}-row-saving`)
+      this.hideMoveVeil()
     }
   }
 
@@ -2205,6 +2242,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       key: drag.key,
       beforeKey: cible.beforeKey,
       afterKey: cible.afterKey,
+      intoKey: cible.intoKey,
       columnId: drag.columnId,
     }
     try {
@@ -2212,6 +2250,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       if (retour instanceof Promise) {
         this.movePending = true
         drag.node.classList.add(`${NS}-row-saving`)
+        this.showMoveVeil()
         await retour
       }
       this.softReload()
@@ -2222,7 +2261,28 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     } finally {
       this.movePending = false
       drag.node.classList.remove(`${NS}-row-saving`)
+      this.hideMoveVeil()
     }
+  }
+
+  /** Voile d'attente d'un déplacement : la grille répond, l'hôte écrit. */
+  private showMoveVeil(): void {
+    if (!this.moveVeil) {
+      this.moveVeil = el('div', {
+        class: `${NS}-move-veil`,
+        children: [el('div', {
+          class: `${NS}-overlay-box`,
+          children: [this.ctx.icon('spinner'), el('span', { text: this.t.t('loading') })],
+        })],
+      })
+    }
+    const hote = this.viewport.parentElement
+    if (hote && !this.moveVeil.parentElement) hote.append(this.moveVeil)
+    this.moveVeil.style.display = 'flex'
+  }
+
+  private hideMoveVeil(): void {
+    if (this.moveVeil) this.moveVeil.style.display = 'none'
   }
 
   /**

@@ -341,6 +341,14 @@ export interface SectionInfo {
    * nombre, ou `{ CHF: …, EUR: … }` quand la colonne mêle des devises.
    */
   totals?: Record<string, number | Record<string, number>>
+  /**
+   * Niveau hiérarchique de la section (groupage serveur) : `0` (défaut) pour
+   * une racine, `1` pour une sous-section, etc. La barre s'indente comme un
+   * groupe client du même niveau. La hiérarchie reste à la charge de la
+   * source : la grille ne fait qu'indenter, l'ordre des sections EST l'ordre
+   * fourni.
+   */
+  level?: number
 }
 
 export interface Datasource<TRow = AnyRow> {
