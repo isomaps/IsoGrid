@@ -117,8 +117,17 @@ export class Sidebar {
           attrs: { type: 'search', placeholder: t.t('searchColumns'), value: this.columnSearch },
           on: {
             input: (e: Event) => {
-              this.columnSearch = (e.target as HTMLInputElement).value
+              const saisie = e.target as HTMLInputElement
+              const curseur = saisie.selectionStart
+              this.columnSearch = saisie.value
               this.render()
+              /* render() reconstruit tout le panneau, champ compris : sans cela le
+                 focus était perdu à chaque caractère tapé. */
+              const champ = this.body.querySelector<HTMLInputElement>(`.${NS}-panel-header input[type="search"]`)
+              if (champ) {
+                champ.focus()
+                if (curseur !== null) champ.setSelectionRange(curseur, curseur)
+              }
             },
           },
         }),
