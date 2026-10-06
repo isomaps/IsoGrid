@@ -2,44 +2,50 @@
    IsoGrid — feuille de style
    Tout est piloté par des variables CSS : un hôte redéfinit `--isg-*` sur
    `.isg-root` (ou plus haut) pour adopter sa charte sans toucher aux règles.
+
+   Palettes clair / sombre (0.30.0) : chaque couleur passe par
+   `--isg-light-<jeton>` ou `--isg-dark-<jeton>` (ex. `--isg-dark-bg`), avec la
+   valeur d'IsoGrid en repli. Posées une fois sur `:root` par l'hôte, elles
+   HÉRITENT partout — shadow DOM, flottants téléportés dans le body — et
+   n'entrent pas en concurrence de spécificité avec les règles du thème.
    ========================================================================== */
 
 .isg-root {
   /* Surfaces */
-  --isg-bg: #ffffff;
-  --isg-bg-alt: #f8fafc;
-  --isg-bg-header: #fbfbfb;
-  --isg-bg-hover: #f1f5f9;
-  --isg-bg-elevated: #ffffff;
-  --isg-bg-skeleton: #e2e8f0;
+  --isg-bg: var(--isg-light-bg, #ffffff);
+  --isg-bg-alt: var(--isg-light-bg-alt, #f8fafc);
+  --isg-bg-header: var(--isg-light-bg-header, #fbfbfb);
+  --isg-bg-hover: var(--isg-light-bg-hover, #f1f5f9);
+  --isg-bg-elevated: var(--isg-light-bg-elevated, #ffffff);
+  --isg-bg-skeleton: var(--isg-light-bg-skeleton, #e2e8f0);
 
   /* Texte */
-  --isg-fg: #0f172a;
-  --isg-fg-muted: #64748b;
-  --isg-fg-header: #334155;
+  --isg-fg: var(--isg-light-fg, #0f172a);
+  --isg-fg-muted: var(--isg-light-fg-muted, #64748b);
+  --isg-fg-header: var(--isg-light-fg-header, #334155);
 
   /* Traits */
-  --isg-border: #e2e8f0;
-  --isg-border-strong: #cbd5e1;
+  --isg-border: var(--isg-light-border, #e2e8f0);
+  --isg-border-strong: var(--isg-light-border-strong, #cbd5e1);
   /* Filets horizontaux de l'en-tête : un cran plus marqué que ceux du corps,
      pour détacher l'en-tête sans l'alourdir d'un aplat. */
-  --isg-border-header: #dcdddd;
+  --isg-border-header: var(--isg-light-border-header, #dcdddd);
 
   /* Accent */
-  --isg-accent: #2563eb;
-  --isg-accent-fg: #ffffff;
-  --isg-accent-soft: #dbeafe;
+  --isg-accent: var(--isg-light-accent, #2563eb);
+  --isg-accent-fg: var(--isg-light-accent-fg, #ffffff);
+  --isg-accent-soft: var(--isg-light-accent-soft, #dbeafe);
 
-  --isg-danger: #dc2626;
+  --isg-danger: var(--isg-light-danger, #dc2626);
   /* Assez sombre pour porter du texte blanc : un avertissement se lit. */
-  --isg-warning: #b45309;
+  --isg-warning: var(--isg-light-warning, #b45309);
 
   /* Formes */
   --isg-radius: 8px;
   --isg-radius-sm: 5px;
-  --isg-shadow: 0 8px 24px -6px rgb(15 23 42 / 18%), 0 2px 6px -2px rgb(15 23 42 / 10%);
-  --isg-shadow-pin: 6px 0 8px -6px rgb(15 23 42 / 28%);
-  --isg-shadow-pin-end: -6px 0 8px -6px rgb(15 23 42 / 28%);
+  --isg-shadow: var(--isg-light-shadow, 0 8px 24px -6px rgb(15 23 42 / 18%), 0 2px 6px -2px rgb(15 23 42 / 10%));
+  --isg-shadow-pin: var(--isg-light-shadow-pin, 6px 0 8px -6px rgb(15 23 42 / 28%));
+  --isg-shadow-pin-end: var(--isg-light-shadow-pin-end, -6px 0 8px -6px rgb(15 23 42 / 28%));
 
   /* Rythme */
   --isg-font: inherit;
@@ -120,47 +126,47 @@
 
 .isg-root[data-isg-theme='dark'],
 .isg-popover[data-isg-theme='dark'] {
-  --isg-bg: #0f172a;
-  --isg-bg-alt: #131f36;
-  --isg-bg-header: #1e293b;
-  --isg-bg-hover: #1e293b;
-  --isg-bg-elevated: #1e293b;
-  --isg-bg-skeleton: #334155;
-  --isg-fg: #e2e8f0;
-  --isg-fg-muted: #94a3b8;
-  --isg-fg-header: #cbd5e1;
-  --isg-border: #1e293b;
-  --isg-border-strong: #334155;
-  --isg-border-header: #334155;
-  --isg-accent: #60a5fa;
-  --isg-accent-fg: #0f172a;
-  --isg-accent-soft: #1e3a5f;
-  --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
-  --isg-shadow-pin: 6px 0 8px -6px rgb(0 0 0 / 60%);
-  --isg-shadow-pin-end: -6px 0 8px -6px rgb(0 0 0 / 60%);
+  --isg-bg: var(--isg-dark-bg, #0f172a);
+  --isg-bg-alt: var(--isg-dark-bg-alt, #131f36);
+  --isg-bg-header: var(--isg-dark-bg-header, #1e293b);
+  --isg-bg-hover: var(--isg-dark-bg-hover, #1e293b);
+  --isg-bg-elevated: var(--isg-dark-bg-elevated, #1e293b);
+  --isg-bg-skeleton: var(--isg-dark-bg-skeleton, #334155);
+  --isg-fg: var(--isg-dark-fg, #e2e8f0);
+  --isg-fg-muted: var(--isg-dark-fg-muted, #94a3b8);
+  --isg-fg-header: var(--isg-dark-fg-header, #cbd5e1);
+  --isg-border: var(--isg-dark-border, #1e293b);
+  --isg-border-strong: var(--isg-dark-border-strong, #334155);
+  --isg-border-header: var(--isg-dark-border-header, #334155);
+  --isg-accent: var(--isg-dark-accent, #60a5fa);
+  --isg-accent-fg: var(--isg-dark-accent-fg, #0f172a);
+  --isg-accent-soft: var(--isg-dark-accent-soft, #1e3a5f);
+  --isg-shadow: var(--isg-dark-shadow, 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%));
+  --isg-shadow-pin: var(--isg-dark-shadow-pin, 6px 0 8px -6px rgb(0 0 0 / 60%));
+  --isg-shadow-pin-end: var(--isg-dark-shadow-pin-end, -6px 0 8px -6px rgb(0 0 0 / 60%));
 }
 
 @media (prefers-color-scheme: dark) {
   .isg-root:not([data-isg-theme='light']) {
     color-scheme: dark;
-    --isg-bg: #0f172a;
-    --isg-bg-alt: #131f36;
-    --isg-bg-header: #1e293b;
-    --isg-bg-hover: #1e293b;
-    --isg-bg-elevated: #1e293b;
-    --isg-bg-skeleton: #334155;
-    --isg-fg: #e2e8f0;
-    --isg-fg-muted: #94a3b8;
-    --isg-fg-header: #cbd5e1;
-    --isg-border: #1e293b;
-    --isg-border-strong: #334155;
-    --isg-border-header: #334155;
-    --isg-accent: #60a5fa;
-    --isg-accent-fg: #0f172a;
-    --isg-accent-soft: #1e3a5f;
-    --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
-    --isg-shadow-pin: 6px 0 8px -6px rgb(0 0 0 / 60%);
-    --isg-shadow-pin-end: -6px 0 8px -6px rgb(0 0 0 / 60%);
+    --isg-bg: var(--isg-dark-bg, #0f172a);
+    --isg-bg-alt: var(--isg-dark-bg-alt, #131f36);
+    --isg-bg-header: var(--isg-dark-bg-header, #1e293b);
+    --isg-bg-hover: var(--isg-dark-bg-hover, #1e293b);
+    --isg-bg-elevated: var(--isg-dark-bg-elevated, #1e293b);
+    --isg-bg-skeleton: var(--isg-dark-bg-skeleton, #334155);
+    --isg-fg: var(--isg-dark-fg, #e2e8f0);
+    --isg-fg-muted: var(--isg-dark-fg-muted, #94a3b8);
+    --isg-fg-header: var(--isg-dark-fg-header, #cbd5e1);
+    --isg-border: var(--isg-dark-border, #1e293b);
+    --isg-border-strong: var(--isg-dark-border-strong, #334155);
+    --isg-border-header: var(--isg-dark-border-header, #334155);
+    --isg-accent: var(--isg-dark-accent, #60a5fa);
+    --isg-accent-fg: var(--isg-dark-accent-fg, #0f172a);
+    --isg-accent-soft: var(--isg-dark-accent-soft, #1e3a5f);
+    --isg-shadow: var(--isg-dark-shadow, 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%));
+    --isg-shadow-pin: var(--isg-dark-shadow-pin, 6px 0 8px -6px rgb(0 0 0 / 60%));
+    --isg-shadow-pin-end: var(--isg-dark-shadow-pin-end, -6px 0 8px -6px rgb(0 0 0 / 60%));
   }
 }
 
@@ -843,42 +849,42 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 
   /* Un flottant vit dans `document.body`, hors de `.isg-root` : il lui faut
      donc sa propre copie des tokens. */
-  --isg-bg-elevated: #ffffff;
-  --isg-bg-hover: #f1f5f9;
-  --isg-bg-alt: #f8fafc;
-  --isg-fg: #0f172a;
-  --isg-fg-muted: #64748b;
-  --isg-border: #e2e8f0;
-  --isg-border-strong: #cbd5e1;
+  --isg-bg-elevated: var(--isg-light-bg-elevated, #ffffff);
+  --isg-bg-hover: var(--isg-light-bg-hover, #f1f5f9);
+  --isg-bg-alt: var(--isg-light-bg-alt, #f8fafc);
+  --isg-fg: var(--isg-light-fg, #0f172a);
+  --isg-fg-muted: var(--isg-light-fg-muted, #64748b);
+  --isg-border: var(--isg-light-border, #e2e8f0);
+  --isg-border-strong: var(--isg-light-border-strong, #cbd5e1);
   /* Filets horizontaux de l'en-tête : un cran plus marqué que ceux du corps,
      pour détacher l'en-tête sans l'alourdir d'un aplat. */
-  --isg-border-header: #dcdddd;
-  --isg-accent: #2563eb;
-  --isg-accent-fg: #ffffff;
-  --isg-accent-soft: #dbeafe;
-  --isg-danger: #dc2626;
-  --isg-warning: #b45309;
+  --isg-border-header: var(--isg-light-border-header, #dcdddd);
+  --isg-accent: var(--isg-light-accent, #2563eb);
+  --isg-accent-fg: var(--isg-light-accent-fg, #ffffff);
+  --isg-accent-soft: var(--isg-light-accent-soft, #dbeafe);
+  --isg-danger: var(--isg-light-danger, #dc2626);
+  --isg-warning: var(--isg-light-warning, #b45309);
   --isg-radius: 8px;
   --isg-radius-sm: 5px;
   --isg-font: inherit;
   --isg-font-size: 13px;
-  --isg-shadow: 0 8px 24px -6px rgb(15 23 42 / 18%), 0 2px 6px -2px rgb(15 23 42 / 10%);
+  --isg-shadow: var(--isg-light-shadow, 0 8px 24px -6px rgb(15 23 42 / 18%), 0 2px 6px -2px rgb(15 23 42 / 10%));
 }
 
 @media (prefers-color-scheme: dark) {
   .isg-popover:not([data-isg-theme='light']) {
     color-scheme: dark;
-    --isg-bg-elevated: #1e293b;
-    --isg-bg-hover: #334155;
-    --isg-bg-alt: #131f36;
-    --isg-fg: #e2e8f0;
-    --isg-fg-muted: #94a3b8;
-    --isg-border: #334155;
-    --isg-border-strong: #475569;
-    --isg-accent: #60a5fa;
-    --isg-accent-fg: #0f172a;
-    --isg-accent-soft: #1e3a5f;
-    --isg-shadow: 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%);
+    --isg-bg-elevated: var(--isg-dark-bg-elevated, #1e293b);
+    --isg-bg-hover: var(--isg-dark-bg-hover, #334155);
+    --isg-bg-alt: var(--isg-dark-bg-alt, #131f36);
+    --isg-fg: var(--isg-dark-fg, #e2e8f0);
+    --isg-fg-muted: var(--isg-dark-fg-muted, #94a3b8);
+    --isg-border: var(--isg-dark-border, #334155);
+    --isg-border-strong: var(--isg-dark-border-strong, #475569);
+    --isg-accent: var(--isg-dark-accent, #60a5fa);
+    --isg-accent-fg: var(--isg-dark-accent-fg, #0f172a);
+    --isg-accent-soft: var(--isg-dark-accent-soft, #1e3a5f);
+    --isg-shadow: var(--isg-dark-shadow, 0 8px 24px -6px rgb(0 0 0 / 55%), 0 2px 6px -2px rgb(0 0 0 / 40%));
   }
 }
 

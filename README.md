@@ -476,6 +476,30 @@ Tout passe par des variables CSS sur `.isg-root` :
 Clair/sombre automatique (`prefers-color-scheme`), forçable via
 `theme: 'light' | 'dark' | 'auto'`.
 
+### Adopter sa charte en clair ET en sombre (0.30.0)
+
+Redéfinir `--isg-bg` sur `.isg-root` ne vaut que pour un thème : en sombre, les
+règles du thème reprennent la main (même spécificité), et les flottants (menus,
+filtres) vivent hors de `.isg-root`. Chaque couleur passe donc par une variable
+**par palette**, avec la valeur d'IsoGrid en repli :
+
+```css
+:root {
+  --isg-dark-bg: #1b1d21;        /* fond des lignes en sombre */
+  --isg-dark-accent: #f2a900;    /* sélection, liens, cases */
+  --isg-light-accent: #b8800a;   /* idem en clair */
+}
+```
+
+Posées une fois tout en haut, elles héritent partout : grilles dans des shadow
+DOM, menus téléportés dans le `body`. Une variable absente garde la valeur
+d'IsoGrid : rien ne change pour un hôte qui n'en pose aucune.
+
+Jetons (préfixer par `--isg-light-` ou `--isg-dark-`) : `bg`, `bg-alt`,
+`bg-header`, `bg-hover`, `bg-elevated`, `bg-skeleton`, `fg`, `fg-muted`,
+`fg-header`, `border`, `border-strong`, `border-header`, `accent`, `accent-fg`,
+`accent-soft`, `danger`, `warning`, `shadow`, `shadow-pin`, `shadow-pin-end`.
+
 ## Variantes d'intégration
 
 ```ts
