@@ -28,6 +28,8 @@ export type MessageKey =
   | 'print' | 'printedOn' | 'printTruncated'
   | 'true' | 'false' | 'bothValues'
   | 'selectionSuffix'
+  /* Barre d'actions sur la sélection (0.31.0). */
+  | 'selectionBarHint' | 'selectionBarCount' | 'selectionBarCountOne'
   | 'opContains' | 'opNotContains' | 'opEquals' | 'opNotEquals'
   | 'opStartsWith' | 'opEndsWith' | 'opBlank' | 'opNotBlank'
   | 'opGt' | 'opGte' | 'opLt' | 'opLte' | 'opBetween'
@@ -128,6 +130,9 @@ const fr: Catalog = {
   false: 'Non',
   bothValues: '(les deux)',
   selectionSuffix: '(sélection)',
+  selectionBarHint: 'Cochez des lignes, ou toutes, pour agir dessus',
+  selectionBarCount: '{n} lignes sélectionnées',
+  selectionBarCountOne: '1 ligne sélectionnée',
   opContains: 'contient',
   opNotContains: 'ne contient pas',
   opEquals: 'égal à',
@@ -264,6 +269,9 @@ const en: Catalog = {
   false: 'No',
   bothValues: '(both)',
   selectionSuffix: '(selection)',
+  selectionBarHint: 'Tick rows, or all of them, to act on them',
+  selectionBarCount: '{n} rows selected',
+  selectionBarCountOne: '1 row selected',
   opContains: 'contains',
   opNotContains: 'does not contain',
   opEquals: 'equals',
@@ -400,6 +408,9 @@ const de: Catalog = {
   false: 'Nein',
   bothValues: '(beide)',
   selectionSuffix: '(Auswahl)',
+  selectionBarHint: 'Zeilen ankreuzen, oder alle, um sie zu bearbeiten',
+  selectionBarCount: '{n} Zeilen ausgewählt',
+  selectionBarCountOne: '1 Zeile ausgewählt',
   opContains: 'enthält',
   opNotContains: 'enthält nicht',
   opEquals: 'gleich',
@@ -536,6 +547,9 @@ const es: Catalog = {
   false: 'No',
   bothValues: '(ambos)',
   selectionSuffix: '(selección)',
+  selectionBarHint: 'Marque filas, o todas, para actuar sobre ellas',
+  selectionBarCount: '{n} filas seleccionadas',
+  selectionBarCountOne: '1 fila seleccionada',
   opContains: 'contiene',
   opNotContains: 'no contiene',
   opEquals: 'igual a',
@@ -672,6 +686,9 @@ const it: Catalog = {
   false: 'No',
   bothValues: '(entrambi)',
   selectionSuffix: '(selezione)',
+  selectionBarHint: 'Seleziona delle righe, o tutte, per agire su di esse',
+  selectionBarCount: '{n} righe selezionate',
+  selectionBarCountOne: '1 riga selezionata',
   opContains: 'contiene',
   opNotContains: 'non contiene',
   opEquals: 'uguale a',
@@ -808,6 +825,9 @@ const nl: Catalog = {
   false: 'Nee',
   bothValues: '(beide)',
   selectionSuffix: '(selectie)',
+  selectionBarHint: 'Vink rijen aan, of alle, om ermee te werken',
+  selectionBarCount: '{n} rijen geselecteerd',
+  selectionBarCountOne: '1 rij geselecteerd',
   opContains: 'bevat',
   opNotContains: 'bevat niet',
   opEquals: 'is gelijk aan',
@@ -944,6 +964,9 @@ const pl: Catalog = {
   false: 'Nie',
   bothValues: '(oba)',
   selectionSuffix: '(zaznaczone)',
+  selectionBarHint: 'Zaznacz wiersze, lub wszystkie, aby na nich działać',
+  selectionBarCount: 'Zaznaczono wierszy: {n}',
+  selectionBarCountOne: 'Zaznaczono 1 wiersz',
   opContains: 'zawiera',
   opNotContains: 'nie zawiera',
   opEquals: 'równa się',
@@ -1080,6 +1103,9 @@ const ru: Catalog = {
   false: 'Нет',
   bothValues: '(оба)',
   selectionSuffix: '(выбранные)',
+  selectionBarHint: 'Отметьте строки или все сразу, чтобы выполнить действие',
+  selectionBarCount: 'Выбрано строк: {n}',
+  selectionBarCountOne: 'Выбрана 1 строка',
   opContains: 'содержит',
   opNotContains: 'не содержит',
   opEquals: 'равно',

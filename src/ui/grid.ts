@@ -29,6 +29,7 @@ import { ToastHost, type ToastOptions } from './toast'
 import { Tooltips } from './tooltip'
 import { Sidebar } from './sidebar'
 import { Toolbar } from './toolbar'
+import { SelectionBar } from './selection-bar'
 import { GroupPanel } from './group-panel'
 import { ContextMenu, type ContextMenuOptions } from './context-menu'
 import { NS, debounce, el, getPath, onLongPress, renderIcon, setPath } from './dom'
@@ -118,6 +119,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private footerRenderer?: FooterRenderer
   private toastHost!: ToastHost
   private toolbar?: Toolbar
+  private selectionBar?: SelectionBar
   private sidebar?: Sidebar
   private groupPanel?: GroupPanel
   private contextMenu?: ContextMenu
@@ -555,6 +557,16 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       root.append(this.toolbar.element)
     }
 
+    if (this.options.selectionBar && this.options.rowSelection === 'multiple') {
+      this.selectionBar = new SelectionBar(
+        this.ctx,
+        this.options.selectionBar,
+        () => this.getSelection(),
+        () => this.deselectAll(),
+      )
+      root.append(this.selectionBar.element)
+    }
+
     if (this.options.groupPanel) {
       this.groupPanel = new GroupPanel(this.ctx, this.options.groupPanel === true ? true : 'whenGrouping')
       root.append(this.groupPanel.element)
@@ -974,6 +986,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.repaintSelection()
     this.renderStatus()
     this.renderFooter()
+    this.selectionBar?.render()
     this.options.onSelectionChanged?.(this.getSelection(), this)
   }
 
@@ -1089,6 +1102,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.renderStatus()
     this.renderFooter()
     this.renderOverlay()
+    // « Tout sauf » : le nombre de lignes sélectionnées suit le total chargé
+    this.selectionBar?.render()
   }
 
   private onLoadError(error: unknown): void {
@@ -3461,9 +3476,14 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   /* --- divers --- */
 
+  refreshToolbar(): void {
+    this.toolbar?.render()
+  }
+
   setLocale(locale: LocaleCode): void {
     this.t.setLocale(locale)
     this.toolbar?.render()
+    this.selectionBar?.render()
     this.render()
   }
 

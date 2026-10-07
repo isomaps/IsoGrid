@@ -404,8 +404,20 @@ export interface ToolbarTag {
   /** Identifiant stable, pour retrouver le tag dans l'état. */
   id: string
   label: string
-  /** État de filtre posé par le tag, par colonne. */
-  filters: Record<string, ColumnFilterModel>
+  /**
+   * État de filtre posé par le tag, par colonne. Facultatif quand l'hôte
+   * pilote lui-même le tag (`isActive` + `onToggle`) : un critère qui n'est
+   * pas une colonne de la grille (paramètre serveur de la page, périmètre).
+   */
+  filters?: Record<string, ColumnFilterModel>
+  /**
+   * Tag piloté par l'hôte (0.31.0) : la grille demande s'il est allumé et lui
+   * confie le clic, au lieu de poser `filters` elle-même. L'hôte recharge
+   * ensuite la grille s'il le faut (`reload()`), et l'état du tag est relu au
+   * rendu suivant de la barre (`refreshToolbar()`).
+   */
+  isActive?: () => boolean
+  onToggle?: (active: boolean) => void
   /** Teinte du tag une fois actif. Défaut : l'accent de la grille. */
   tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'
   /** Infobulle. */
@@ -425,7 +437,76 @@ export interface ToolbarTag {
   badgeTitle?: string
 }
 
+/**
+ * Entrée du menu d'un bouton fourni par l'hôte (`toolbar.items`) : même forme
+ * que le menu contextuel, plus un repère à droite (`hint`, un nombre par
+ * exemple) et une marque d'entrée courante (`active`).
+ */
+export interface ToolbarMenuEntry extends ContextMenuItem {
+  hint?: string
+  active?: boolean
+}
+
+/**
+ * Bouton fourni par l'hôte dans la barre d'outils (0.31.0), placé en tête du
+ * groupe de droite, avant la recherche (après « Vues » s'il existe) : action
+ * simple (`onClick`) ou menu déroulant (`menu`). Libellé, état et menu sont
+ * relus à chaque rendu de la barre : l'hôte appelle `refreshToolbar()` quand
+ * ce qu'ils montrent change.
+ */
+export interface ToolbarItem {
+  id: string
+  label: string | (() => string)
+  icon?: IconName
+  /** Pictogramme de l'hôte, prioritaire sur `icon`. */
+  iconNode?: () => Node
+  title?: string
+  /** Mise en avant : bordure d'accent (un choix courant, un périmètre). */
+  emphasis?: boolean
+  disabled?: () => boolean
+  hidden?: () => boolean
+  onClick?: (anchor: HTMLElement) => void
+  /** Entrées du menu, construites à chaque ouverture. */
+  menu?: () => ToolbarMenuEntry[] | Promise<ToolbarMenuEntry[]>
+  /** Champ de recherche en tête du menu, qui filtre les entrées par libellé. */
+  menuSearch?: string
+}
+
+/**
+ * Barre d'actions sur la sélection (0.31.0), entre la barre d'outils et
+ * l'en-tête. Toujours visible par défaut : grisée, elle dit comment agir
+ * (cocher des lignes) ; avec une sélection, elle donne le nombre de lignes et
+ * active les actions. Les actions reçoivent la sélection telle que
+ * `getSelection()` la rend — y compris « tout sauf ces lignes » en modèle
+ * serveur, que seul l'hôte sait résoudre.
+ */
+export interface SelectionAction {
+  id: string
+  label: string
+  icon?: IconName
+  iconNode?: () => Node
+  title?: string
+  /** `danger` : action destructrice ou difficile à défaire. */
+  tone?: 'neutral' | 'primary' | 'danger'
+  hidden?: (selection: SelectionSnapshot) => boolean
+  disabled?: (selection: SelectionSnapshot) => boolean
+  onClick: (selection: SelectionSnapshot) => void
+}
+
+export interface SelectionBarOptions {
+  actions: SelectionAction[]
+  /** `false` : la barre n'apparaît qu'avec une sélection. Défaut : `true`. */
+  alwaysVisible?: boolean
+  /** Consigne affichée sans sélection. Défaut : libellé du catalogue. */
+  hint?: string
+  /** Texte du compteur. Défaut : « {n} lignes sélectionnées ». */
+  countLabel?: (count: number) => string
+}
+
 export interface ToolbarOptions {
+  /** Boutons et menus fournis par l'hôte (0.31.0). */
+  items?: ToolbarItem[]
+
   /**
    * Tags de filtres rapides, rendus à GAUCHE de la recherche.
    *
@@ -680,6 +761,8 @@ export interface IsoGridOptions<TRow = AnyRow> {
 
   /** Appelé à chaque changement de sélection. */
   onSelectionChanged?: (selection: SelectionSnapshot, grid: IsoGridApi<TRow>) => void
+  /** Barre d'actions sur la sélection (0.31.0). Demande `rowSelection: 'multiple'`. */
+  selectionBar?: SelectionBarOptions
 
   /**
    * Colonnes de groupage initiales, dans l'ordre des niveaux.
@@ -981,6 +1064,11 @@ export interface IsoGridApi<TRow = AnyRow> {
   refresh(): void
   /** Recharge en repartant du haut (après un changement de tri/filtre). */
   reload(): void
+  /**
+   * Redessine la barre d'outils (0.31.0) : libellés et états des boutons de
+   * l'hôte (`toolbar.items`) et des tags pilotés par l'hôte sont relus.
+   */
+  refreshToolbar(): void
   setRows(rows: TRow[]): void
   /**
    * Nombre de lignes de DONNÉES après filtrage — les lignes de groupe n'y

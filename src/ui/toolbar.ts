@@ -1,4 +1,4 @@
-import type { ColumnFilterModel, ToolbarTag, ToolbarOptions } from '../core/types'
+import type { ColumnFilterModel, ToolbarItem, ToolbarMenuEntry, ToolbarTag, ToolbarOptions } from '../core/types'
 import type { GridContext } from './context'
 import { NS, debounce, el, onDismiss, positionFloating } from './dom'
 import type { SavedViewsMenu } from './saved-views'
@@ -47,6 +47,14 @@ export class Toolbar {
     // En tête du groupe de droite : une vue fixe tout ce que les boutons
     // suivants règlent un à un (recherche, filtres, colonnes).
     if (this.views) this.right.append(this.views.buildButton())
+
+    // Boutons de l'hôte : juste après « Vues », avant la recherche — ce sont
+    // des choix de périmètre ou des actions de la page, pas des réglages
+    // d'affichage.
+    for (const item of this.options.items ?? []) {
+      if (item.hidden?.()) continue
+      this.right.append(this.buildItem(item))
+    }
 
     if (this.options.quickFilter !== false) {
       const debounced = debounce((value: string) => {
@@ -195,6 +203,96 @@ export class Toolbar {
     badge.parentElement?.classList.toggle(`${NS}-active`, count > 0)
   }
 
+  /** Menu ouvert d'un bouton de l'hôte : refermé si on reclique dessus. */
+  private closeItemMenu?: () => void
+  private itemMenuClosedAt = 0
+
+  private buildItem(item: ToolbarItem): HTMLElement {
+    const label = typeof item.label === 'function' ? item.label() : item.label
+    const disabled = item.disabled?.() ?? false
+    const icon = item.iconNode?.() ?? (item.icon ? this.ctx.icon(item.icon) : null)
+    return el('button', {
+      class: `${NS}-btn ${NS}-host-btn${item.emphasis ? ` ${NS}-host-btn-emphasis` : ''}`,
+      attrs: {
+        type: 'button',
+        'data-item-id': item.id,
+        disabled: disabled ? true : undefined,
+        ...(item.title ? { title: item.title } : {}),
+        ...(item.menu ? { 'aria-haspopup': 'menu' } : {}),
+      },
+      children: [
+        ...(icon ? [icon] : []),
+        el('span', { class: `${NS}-host-btn-label`, text: label }),
+        ...(item.menu ? [this.ctx.icon('chevron-down')] : []),
+      ],
+      on: {
+        click: (e: MouseEvent) => {
+          const anchor = e.currentTarget as HTMLElement
+          if (item.menu) { void this.openItemMenu(item, anchor) } else item.onClick?.(anchor)
+        },
+      },
+    })
+  }
+
+  private async openItemMenu(item: ToolbarItem, anchor: HTMLElement): Promise<void> {
+    if (this.closeItemMenu) { this.closeItemMenu(); return }
+    if (performance.now() - this.itemMenuClosedAt < 300) return
+    const entries: ToolbarMenuEntry[] = await item.menu!()
+
+    const menu = el('div', { class: `${NS}-popover ${NS}-menu ${NS}-host-menu`, attrs: { role: 'menu' } })
+    const theme = anchor.closest(`.${NS}-root`)?.getAttribute('data-isg-theme')
+    if (theme) menu.setAttribute('data-isg-theme', theme)
+    let dispose = () => {}
+    const close = (parClicExterieur = false) => {
+      dispose(); menu.remove(); this.closeItemMenu = undefined
+      if (parClicExterieur) this.itemMenuClosedAt = performance.now()
+    }
+    this.closeItemMenu = () => close()
+
+    const list = el('div', { class: `${NS}-host-menu-list` })
+    const nodes: { node: HTMLElement; text: string }[] = []
+    for (const entry of entries) {
+      if (entry.separator) { list.append(el('div', { class: `${NS}-menu-sep` })); continue }
+      if (entry.heading) { list.append(el('div', { class: `${NS}-views-section`, text: entry.heading })); continue }
+      const icon = entry.iconNode?.() ?? (entry.icon ? this.ctx.icon(entry.icon) : el('span', { class: `${NS}-icon ${NS}-views-spacer` }))
+      const node = el('button', {
+        class: `${NS}-menu-item${entry.active ? ` ${NS}-active` : ''}`,
+        attrs: { type: 'button', role: 'menuitem', disabled: entry.disabled ? true : undefined, ...(entry.title ? { title: entry.title } : {}) },
+        children: [
+          icon,
+          el('span', { class: `${NS}-views-label`, text: entry.label ?? '' }),
+          ...(entry.hint ? [el('span', { class: `${NS}-host-menu-hint`, text: entry.hint })] : []),
+        ],
+        on: { click: () => { if (entry.disabled) return; close(); void entry.action?.() } },
+      })
+      nodes.push({ node, text: (entry.label ?? '').toLocaleLowerCase() })
+      list.append(node)
+    }
+
+    if (item.menuSearch) {
+      const input = el('input', {
+        class: `${NS}-input ${NS}-host-menu-search`,
+        attrs: { type: 'search', placeholder: item.menuSearch, 'aria-label': item.menuSearch },
+        on: {
+          input: (e: Event) => {
+            const q = (e.target as HTMLInputElement).value.trim().toLocaleLowerCase()
+            // Seules les entrées cliquables se filtrent ; intertitres et
+            // séparateurs restent, pour garder les repères du menu.
+            for (const n of nodes) n.node.hidden = q !== '' && !n.text.includes(q)
+          },
+        },
+      })
+      menu.append(input)
+    }
+    menu.append(list)
+
+    this.ctx.portal().append(menu)
+    positionFloating(anchor, menu)
+    dispose = onDismiss(menu, () => close(true))
+    const focus = menu.querySelector<HTMLElement>(item.menuSearch ? 'input' : 'button:not([disabled])')
+    focus?.focus()
+  }
+
   private openExportMenu(anchor: HTMLElement): void {
     const t = this.ctx.t
     const menu = el('div', { class: `${NS}-popover ${NS}-menu`, attrs: { role: 'menu' } })
@@ -238,8 +336,9 @@ export class Toolbar {
    * différentes du même état.
    */
   private tagEstActif(tag: ToolbarTag): boolean {
+    if (tag.isActive) return tag.isActive()
     const etat = this.ctx.columns.getState().filters
-    const entrees = Object.entries(tag.filters)
+    const entrees = Object.entries(tag.filters ?? {})
     if (entrees.length === 0) return false
 
     return entrees.every(([colonne, modele]) => memeFiltre(etat[colonne], modele))
@@ -268,7 +367,13 @@ export class Toolbar {
       on: {
         click: () => {
           const etaitActif = this.tagEstActif(tag)
-          for (const [colonne, modele] of Object.entries(tag.filters)) {
+          if (tag.onToggle) {
+            // Tag piloté par l'hôte : il applique son critère et recharge.
+            tag.onToggle(!etaitActif)
+            queueMicrotask(() => this.render())
+            return
+          }
+          for (const [colonne, modele] of Object.entries(tag.filters ?? {})) {
             this.ctx.api.setFilter(colonne, etaitActif ? null : modele)
           }
           // Après le tour de boucle : `setFilter` passe par le modèle de

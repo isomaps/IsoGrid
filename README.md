@@ -416,6 +416,57 @@ d'être appelé en plus, pour les hôtes qui veulent faire les deux — sauf pen
 la restauration : la grille ne renvoie pas à l'hôte ce qu'il vient de lui
 donner.
 
+## Actions sur la sélection, boutons de l'hôte (0.31.0)
+
+Trois points d'accroche pour qu'une page agisse sur la grille sans bricoler
+son DOM. Tous sont facultatifs : sans eux, rien ne change.
+
+**Barre d'actions sur la sélection** (`selectionBar`, avec
+`rowSelection: 'multiple'`). Elle s'affiche entre la barre d'outils et
+l'en-tête. Elle est **toujours visible** : grisée, elle dit comment s'en servir
+(« Cochez des lignes, ou toutes, pour agir dessus ») ; avec une sélection, elle
+donne le nombre de lignes et active les actions. Des actions qui n'apparaissent
+qu'une fois des lignes cochées, personne ne les trouve. Chaque action reçoit
+la sélection telle que `getSelection()` la rend, y compris « toutes sauf ces
+lignes » en modèle serveur, que seul l'hôte sait résoudre.
+
+```ts
+new IsoGrid(el, {
+  rowSelection: 'multiple',
+  selectionBar: {
+    actions: [
+      { id: 'assign', label: 'Assigner…', onClick: (sel) => ouvrirAssignation(sel) },
+      { id: 'archive', label: 'Archiver', tone: 'danger', onClick: (sel) => archiver(sel) },
+    ],
+    // alwaysVisible: false  → seulement avec une sélection
+  },
+})
+```
+
+**Boutons et menus de l'hôte** (`toolbar.items`), en tête du groupe de droite,
+après « Vues » : une action (`onClick`) ou un menu (`menu`, avec recherche
+facultative `menuSearch`). Libellé, état et menu sont relus à chaque rendu :
+appeler `grid.refreshToolbar()` quand ils changent.
+
+```ts
+toolbar: {
+  items: [{
+    id: 'segment', emphasis: true,
+    label: () => `Segment : ${segmentCourant.nom}`,
+    menuSearch: 'Rechercher un segment…',
+    menu: async () => [
+      ...(await segments()).map(s => ({ label: s.nom, hint: String(s.n), active: s.id === courant, action: () => appliquer(s) })),
+      { separator: true },
+      { label: 'Gérer les segments…', action: ouvrirGestion },
+    ],
+  }],
+}
+```
+
+**Tags pilotés par l'hôte** : un tag sans `filters`, avec `isActive()` et
+`onToggle(actif)`, pour un critère qui n'est pas une colonne (paramètre serveur
+de la page). L'hôte applique son critère et recharge (`reload()`).
+
 ## Vues enregistrées
 
 L'utilisateur enregistre l'état courant de la grille sous un nom — colonnes
