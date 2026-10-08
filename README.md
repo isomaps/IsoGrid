@@ -346,7 +346,7 @@ grid.addColumn(def, atIndex?) / removeColumn(id) / setColumns(defs)
 grid.setColumnVisible(id, bool) / moveColumn(id, index) / pinColumn(id, 'start'|'end'|false)
 grid.autoSizeColumn(id) / sizeColumnsToFit()
 grid.setSort([...]) / setFilter(id, model|null) / clearFilters() / setQuickFilter(str)
-grid.refresh() / reload() / setRows(rows) / getLoadedRows() / getDisplayedRowCount()
+grid.refresh() / reload() / setRows(rows, { keepScroll? }) / getLoadedRows() / getDisplayedRowCount()
 grid.exportExcel(opts) / exportCsv(opts)
 grid.setLocale('de') / setTheme('dark') / destroy()
 ```
@@ -775,11 +775,59 @@ grid.selectAll() / deselectAll()
 
 Un **tri** la conserve : l'ensemble des lignes ne change pas, seulement leur
 ordre. Un **changement de filtre** l'efface : en mode `exclude`, « tout sauf
-ces trois-là » désignerait sinon silencieusement d'autres lignes.
+ces trois-là » désignerait sinon silencieusement d'autres lignes. Pour
+la garder malgré tout : `keepSelectionOnFilter` (0.32.0, ci-dessous).
 
 > ⚠️ En mode serveur, fournir un `getRowId` **stable** (une clé métier). À
 > défaut, la sélection retombe sur l'index de ligne, qui change à chaque tri —
 > la grille émet un avertissement en console dans ce cas.
+
+### Lignes non sélectionnables, sélection qui survit aux filtres, `setRows` sur place (0.32.0)
+
+Trois options, toutes facultatives : sans elles, rien ne change.
+
+```ts
+new IsoGrid(el, {
+  rowSelection: 'multiple',
+  getRowId: (row) => String(row.id),
+  isRowSelectable: (row) => row.statut !== 'écartée', // (row) => boolean
+  keepSelectionOnFilter: true,                         // défaut : false
+  keepScrollOnSetRows: true,                           // défaut : false
+})
+grid.setRows(lignes, { keepScroll: true })            // au cas par cas
+```
+
+**`isRowSelectable(row)`** — une ligne pour laquelle la fonction rend `false`
+a une case grisée et inerte (ni clic, ni tabulation, ni barre d'espace) et la
+classe `isg-row-unselectable`. Elle échappe au « tout sélectionner », au
+Maj-clic, au clic sur la ligne (`selectOnRowClick`), à la case d'un groupe et
+à `setRowSelected(id, true)` ; `getSelectedRows()`, `getSelection()` et
+`isRowSelected()` ne la rendent jamais, même si une sélection antérieure la
+contenait. La fonction est relue à chaque rendu : après un changement de
+l'état dont elle dépend, `setRows()` ou `refresh()` met les cases à jour.
+En mode client, « tout sélectionner » coche alors les lignes affichées et
+cochables une à une (mode `include`) ; en mode serveur, il reste en mode
+`exclude` et y ajoute les lignes **chargées** non sélectionnables — au
+serveur d'écarter les autres.
+
+**`keepSelectionOnFilter: true`** — changer un filtre, la recherche ou le tri
+ne vide plus la sélection. Les lignes sélectionnées que le filtre masque
+restent sélectionnées ; la barre d'état et la barre de sélection affichent
+« 12 sélectionnées (dont 3 masquées) », et `getSelection().hidden` vaut 3.
+La case d'en-tête agit sur les lignes **affichées** : la cocher les ajoute, la
+décocher ne retire qu'elles, et son état (aucune / partielle / toutes) se lit
+sur elles seules. En mode client, `getSelectedRows()` rend les lignes
+sélectionnées affichées, dans l'ordre de la grille, puis les masquées, dans
+l'ordre des données. Une identité stable (`getRowId` ou champ `id`) est
+indispensable. En mode serveur, une sélection `include` survit au filtre ;
+un « tout sauf » (`exclude`) est toujours vidé.
+
+**`setRows(rows, { keepScroll: true })`** (ou `keepScrollOnSetRows: true` pour
+tous les appels) — la grille reste où elle était : `scrollTop` et `scrollLeft`
+du corps, focus dans la ligne (retrouvée par son identifiant, une fois
+redessinée) et ligne d'ancrage du Maj-clic. La sélection suit les
+identifiants, avec ou sans l'option. Sans l'option, `setRows` revient en haut
+comme avant.
 
 ## Menu contextuel (clic droit)
 

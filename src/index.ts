@@ -62,5 +62,5 @@ export type {
   FilterType, GridState, IconName, IsoGridApi, IsoGridOptions, LocaleCode,
   NumberOperator, PinPosition, PrintOptions, SetFilterOption, SetOperator, SidebarOptions,
   SortModel, TextOperator, ThemeMode, ToolbarOptions,
-  ToolbarItem, ToolbarMenuEntry, ToolbarTag, SelectionAction, SelectionBarOptions,
+  ToolbarItem, ToolbarMenuEntry, ToolbarTag, SelectionAction, SelectionBarOptions, SetRowsOptions,
 } from './core/types'

@@ -27,7 +27,7 @@ export type MessageKey =
   | 'exportTruncated' | 'exportFailed' | 'exportNoExcelLib'
   | 'print' | 'printedOn' | 'printTruncated'
   | 'true' | 'false' | 'bothValues'
-  | 'selectionSuffix'
+  | 'selectionSuffix' | 'selectionHidden' | 'rowNotSelectable'
   /* Barre d'actions sur la sélection (0.31.0). */
   | 'selectionBarHint' | 'selectionBarCount' | 'selectionBarCountOne'
   | 'opContains' | 'opNotContains' | 'opEquals' | 'opNotEquals'
@@ -130,6 +130,8 @@ const fr: Catalog = {
   false: 'Non',
   bothValues: '(les deux)',
   selectionSuffix: '(sélection)',
+  selectionHidden: '(dont {n} masquées)',
+  rowNotSelectable: 'Ligne non sélectionnable',
   selectionBarHint: 'Cochez des lignes, ou toutes, pour agir dessus',
   selectionBarCount: '{n} lignes sélectionnées',
   selectionBarCountOne: '1 ligne sélectionnée',
@@ -269,6 +271,8 @@ const en: Catalog = {
   false: 'No',
   bothValues: '(both)',
   selectionSuffix: '(selection)',
+  selectionHidden: '({n} hidden)',
+  rowNotSelectable: 'This row cannot be selected',
   selectionBarHint: 'Tick rows, or all of them, to act on them',
   selectionBarCount: '{n} rows selected',
   selectionBarCountOne: '1 row selected',
@@ -408,6 +412,8 @@ const de: Catalog = {
   false: 'Nein',
   bothValues: '(beide)',
   selectionSuffix: '(Auswahl)',
+  selectionHidden: '(davon {n} ausgeblendet)',
+  rowNotSelectable: 'Diese Zeile kann nicht ausgewählt werden',
   selectionBarHint: 'Zeilen ankreuzen, oder alle, um sie zu bearbeiten',
   selectionBarCount: '{n} Zeilen ausgewählt',
   selectionBarCountOne: '1 Zeile ausgewählt',
@@ -547,6 +553,8 @@ const es: Catalog = {
   false: 'No',
   bothValues: '(ambos)',
   selectionSuffix: '(selección)',
+  selectionHidden: '({n} ocultas)',
+  rowNotSelectable: 'Esta fila no se puede seleccionar',
   selectionBarHint: 'Marque filas, o todas, para actuar sobre ellas',
   selectionBarCount: '{n} filas seleccionadas',
   selectionBarCountOne: '1 fila seleccionada',
@@ -686,6 +694,8 @@ const it: Catalog = {
   false: 'No',
   bothValues: '(entrambi)',
   selectionSuffix: '(selezione)',
+  selectionHidden: '(di cui {n} nascoste)',
+  rowNotSelectable: 'Questa riga non è selezionabile',
   selectionBarHint: 'Seleziona delle righe, o tutte, per agire su di esse',
   selectionBarCount: '{n} righe selezionate',
   selectionBarCountOne: '1 riga selezionata',
@@ -825,6 +835,8 @@ const nl: Catalog = {
   false: 'Nee',
   bothValues: '(beide)',
   selectionSuffix: '(selectie)',
+  selectionHidden: '(waarvan {n} verborgen)',
+  rowNotSelectable: 'Deze rij kan niet worden geselecteerd',
   selectionBarHint: 'Vink rijen aan, of alle, om ermee te werken',
   selectionBarCount: '{n} rijen geselecteerd',
   selectionBarCountOne: '1 rij geselecteerd',
@@ -964,6 +976,8 @@ const pl: Catalog = {
   false: 'Nie',
   bothValues: '(oba)',
   selectionSuffix: '(zaznaczone)',
+  selectionHidden: '(w tym ukryte: {n})',
+  rowNotSelectable: 'Tego wiersza nie można zaznaczyć',
   selectionBarHint: 'Zaznacz wiersze, lub wszystkie, aby na nich działać',
   selectionBarCount: 'Zaznaczono wierszy: {n}',
   selectionBarCountOne: 'Zaznaczono 1 wiersz',
@@ -1103,6 +1117,8 @@ const ru: Catalog = {
   false: 'Нет',
   bothValues: '(оба)',
   selectionSuffix: '(выбранные)',
+  selectionHidden: '(из них скрыто: {n})',
+  rowNotSelectable: 'Эту строку нельзя выбрать',
   selectionBarHint: 'Отметьте строки или все сразу, чтобы выполнить действие',
   selectionBarCount: 'Выбрано строк: {n}',
   selectionBarCountOne: 'Выбрана 1 строка',

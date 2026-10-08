@@ -493,6 +493,12 @@ export interface SelectionAction {
   onClick: (selection: SelectionSnapshot) => void
 }
 
+/** Options de `setRows()` (0.32.0). */
+export interface SetRowsOptions {
+  /** Garder défilement, focus et ancrage du Maj-clic. Défaut : `keepScrollOnSetRows`, sinon `false`. */
+  keepScroll?: boolean
+}
+
 export interface SelectionBarOptions {
   actions: SelectionAction[]
   /** `false` : la barre n'apparaît qu'avec une sélection. Défaut : `true`. */
@@ -763,6 +769,50 @@ export interface IsoGridOptions<TRow = AnyRow> {
   onSelectionChanged?: (selection: SelectionSnapshot, grid: IsoGridApi<TRow>) => void
   /** Barre d'actions sur la sélection (0.31.0). Demande `rowSelection: 'multiple'`. */
   selectionBar?: SelectionBarOptions
+
+  /**
+   * Lignes sélectionnables (0.32.0). Rend `false` pour une ligne qu'on ne doit
+   * pas pouvoir cocher : sa case est grisée et inactive, elle échappe au
+   * « tout sélectionner », au Maj-clic, au clic sur la ligne et aux appels
+   * `setRowSelected(id, true)`, et `getSelectedRows()` / `getSelection()` ne
+   * la rendent jamais — même si une sélection antérieure la contenait.
+   *
+   * La fonction est relue à chaque rendu : après un changement de l'état dont
+   * elle dépend, `setRows()` ou `refresh()` met les cases à jour.
+   *
+   * En mode serveur, seules les lignes CHARGÉES sont connues : « tout
+   * sélectionner » ajoute aux exclus celles qui sont chargées et non
+   * sélectionnables ; au serveur d'écarter les autres. Absent : toutes les
+   * lignes sont sélectionnables (comportement antérieur).
+   */
+  isRowSelectable?: (row: TRow) => boolean
+
+  /**
+   * Garder la sélection quand un filtre, la recherche ou le tri change (0.32.0).
+   * Défaut : `false` — changer un filtre vide la sélection.
+   *
+   * Les lignes sélectionnées que le filtre masque restent sélectionnées ; la
+   * barre d'état et la barre de sélection l'indiquent (« 12 sélectionnées
+   * (dont 3 masquées) ») et `getSelection().hidden` en donne le nombre. La
+   * case d'en-tête n'agit plus que sur les lignes AFFICHÉES : cocher les
+   * ajoute, décocher ne retire qu'elles, et son état se lit sur elles seules.
+   *
+   * Mode client : `getSelectedRows()` rend les lignes sélectionnées affichées
+   * (dans l'ordre de la grille) PUIS les masquées (dans l'ordre des données).
+   * Il faut une identité stable (`getRowId` ou champ `id`) : l'index ne
+   * désigne plus la même ligne une fois le filtre changé.
+   *
+   * Mode serveur : la sélection survit au changement tant qu'elle est une
+   * liste de lignes cochées ; un « tout sélectionner » (mode « tout sauf »)
+   * est toujours vidé, car il désignerait silencieusement d'autres lignes.
+   */
+  keepSelectionOnFilter?: boolean
+
+  /**
+   * `setRows()` garde la position de défilement (0.32.0) — comme si l'on
+   * passait `{ keepScroll: true }` à chaque appel. Défaut : `false`.
+   */
+  keepScrollOnSetRows?: boolean
 
   /**
    * Colonnes de groupage initiales, dans l'ordre des niveaux.
@@ -1069,7 +1119,15 @@ export interface IsoGridApi<TRow = AnyRow> {
    * l'hôte (`toolbar.items`) et des tags pilotés par l'hôte sont relus.
    */
   refreshToolbar(): void
-  setRows(rows: TRow[]): void
+  /**
+   * Remplace les lignes (mode client). Avec `keepScroll` (ou l'option de
+   * grille `keepScrollOnSetRows`), la grille reste où elle était : défilement
+   * vertical et horizontal, focus dans la ligne (retrouvée par son
+   * identifiant) et ligne d'ancrage du Maj-clic. La sélection, elle, suit
+   * toujours les identifiants (`getRowId` ou champ `id`). Sans l'option, la
+   * grille revient en haut, comme avant la 0.32.0.
+   */
+  setRows(rows: TRow[], options?: SetRowsOptions): void
   /**
    * Nombre de lignes de DONNÉES après filtrage — les lignes de groupe n'y
    * comptent pas. C'est le chiffre affiché dans la barre d'état et celui

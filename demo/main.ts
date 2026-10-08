@@ -135,6 +135,11 @@ function build(mode: 'server' | 'client') {
   onStateChange: (state) => localStorage.setItem(STATE_KEY, JSON.stringify(state)),
   export: { filename: 'factures', sheetName: 'Factures', source: 'all', maxRows: 100_000 },
   rowSelection: 'multiple',
+  // 0.32.0 : une facture annulée ne se coche pas ; en modèle client, la
+  // sélection survit aux filtres et « Recharger les lignes » ne bouge pas.
+  isRowSelectable: (row) => row.status !== 'annulée',
+  keepSelectionOnFilter: mode === 'client',
+  keepScrollOnSetRows: true,
   rowActions: {
     items: (row) => [
       { label: `Ouvrir ${row.number}`, icon: 'eye' as const, action: () => console.debug('[demo] ouvrir', row.number) },
@@ -168,6 +173,7 @@ function build(mode: 'server' | 'client') {
       el.textContent = sel.isEmpty
         ? 'aucune sélection'
         : `mode ${sel.mode} · ${sel.count ?? '?'} ligne(s) · ${sel.ids.length} id(s) transmis`
+          + (sel.hidden ? ` · dont ${sel.hidden} masquée(s)` : '')
     }
   },
   sidebar: { panels: ['columns', 'filters'], defaultOpen: false },
@@ -202,6 +208,16 @@ document.querySelector('#remove-column')!.addEventListener('click', () => {
   if (extraColumnCount === 0) return
   grid.removeColumn(`extra${extraColumnCount}`)
   extraColumnCount--
+})
+
+// 0.32.0 : remplace les lignes (copie fraîche) sans perdre défilement,
+// focus ni sélection — le cas d'un hôte qui recharge après une action.
+document.querySelector('#reload-rows')!.addEventListener('click', () => {
+  if ((document.querySelector<HTMLSelectElement>('#rowmodel')!).value !== 'client') {
+    grid.refresh()
+    return
+  }
+  grid.setRows(rows.map(r => ({ ...r })), { keepScroll: true })
 })
 
 document.querySelector('#fit')!.addEventListener('click', () => grid.sizeColumnsToFit())

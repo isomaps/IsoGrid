@@ -1,7 +1,7 @@
 import type {
   AnyRow, CellContext, ColumnDef, Datasource, ExportOptions, ExportProgress, PrintOptions,
   GridState, IconName, IsoGridApi, IsoGridOptions, LocaleCode, PinPosition,
-  SectionInfo, SetFilterOption, SortModel, ThemeMode,
+  SectionInfo, SetFilterOption, SetRowsOptions, SortModel, ThemeMode,
 } from '../core/types'
 import { ColumnModel, type RenderColumn } from '../core/table'
 import {
@@ -98,6 +98,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private detailObserver?: ResizeObserver
   /** Dernière ligne cochée, pour la sélection de plage au Maj-clic. */
   private lastSelectedIndex: number | null = null
+  /** Focus à reposer après un `setRows({ keepScroll })`, une fois la ligne dessinée. */
+  private pendingFocus: { rowId: string; colId: string | null } | null = null
   /** Cellule en cours d'édition. Une seule à la fois. */
   private edition: {
     cell: HTMLElement
@@ -968,6 +970,101 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     return this.options.rowSelection === 'single' || this.options.rowSelection === 'multiple'
   }
 
+  /** La ligne peut-elle être cochée ? Voir l'option `isRowSelectable` (0.32.0). */
+  private rowSelectable(row: TRow): boolean {
+    const f = this.options.isRowSelectable
+    if (!f) return true
+    try {
+      return f(row) !== false
+    } catch {
+      // Une fonction de l'hôte qui lève ne doit pas casser le rendu : dans le
+      // doute, la ligne reste cochable, comme sans l'option.
+      return true
+    }
+  }
+
+  /** Cochée À L'ÉCRAN : une ligne non sélectionnable ne l'est jamais. */
+  private rowShownSelected(row: TRow, index: number): boolean {
+    return this.selection.isSelected(this.rowId(row, index)) && this.rowSelectable(row)
+  }
+
+  /**
+   * « Tout sélectionner » énumère les lignes affichées au lieu de passer en
+   * mode « tout sauf » : seulement en mode client (tout est en mémoire), et
+   * seulement quand une option 0.32.0 l'exige — sinon rien ne change.
+   */
+  private enumeratesSelectAll(): boolean {
+    return this.clientSource != null
+      && (this.options.isRowSelectable != null || this.options.keepSelectionOnFilter === true)
+  }
+
+  /** Lignes du jeu filtré et trié, avec leur identifiant (mode client). */
+  private displayedClientRows(): Array<{ row: TRow; id: string }> {
+    if (!this.clientSource) return []
+    return this.clientSource.getResolvedRows(this.buildRequestContext())
+      .map((row, i) => ({ row, id: this.rowId(row, i) }))
+  }
+
+  /**
+   * Identifiants connus et non sélectionnables : toutes les lignes en mode
+   * client, les lignes chargées en mode serveur. `null` sans `isRowSelectable`.
+   */
+  private unselectableIds(scope: 'all' | 'displayed' = 'all'): Set<string> | null {
+    if (!this.options.isRowSelectable) return null
+    const out = new Set<string>()
+    if (this.clientSource) {
+      if (scope === 'displayed') {
+        for (const { row, id } of this.displayedClientRows()) if (!this.rowSelectable(row)) out.add(id)
+      } else {
+        this.clientSource.getAllRows().forEach((row, i) => {
+          if (!this.rowSelectable(row)) out.add(this.rowId(row, i))
+        })
+      }
+    } else {
+      this.cache.getLoadedRows().forEach((row, i) => {
+        if (!this.rowSelectable(row)) out.add(this.rowId(row, i))
+      })
+    }
+    return out
+  }
+
+  /** Filtre, recherche (ou vue) changés : faut-il vider la sélection ? */
+  private onFilterSetChanged(): void {
+    this.lastSelectedIndex = null
+    // `keepSelectionOnFilter` : une liste de lignes cochées reste juste quel
+    // que soit le filtre. Le mode « tout sauf », lui, désignerait d'autres
+    // lignes : il est vidé dans tous les cas.
+    if (this.options.keepSelectionOnFilter && this.selection.getMode() === 'include') return
+    this.selection.clear()
+  }
+
+  /** Coche (ou décoche) depuis la case d'en-tête. */
+  private toggleAllFromHeader(on: boolean): void {
+    if (!this.enumeratesSelectAll()) {
+      if (on) this.selectAll()
+      else this.selection.clear()
+      return
+    }
+    const affichees = this.displayedClientRows()
+    if (on) {
+      this.selection.selectRange(affichees.filter(r => this.rowSelectable(r.row)).map(r => r.id), true)
+    } else if (this.options.keepSelectionOnFilter) {
+      // Décocher l'en-tête ne retire que ce qu'on voit
+      this.selection.selectRange(affichees.map(r => r.id), false)
+    } else {
+      this.selection.clear()
+    }
+  }
+
+  /** État de la case d'en-tête, lu sur les lignes affichées en mode énuméré. */
+  private headerCheckboxState(): 'none' | 'some' | 'all' {
+    if (!this.enumeratesSelectAll()) return this.selection.headerState(this.cache.getRowCount())
+    const cochables = this.displayedClientRows().filter(r => this.rowSelectable(r.row))
+    const n = cochables.filter(r => this.selection.isSelected(r.id)).length
+    if (n === 0) return 'none'
+    return n === cochables.length ? 'all' : 'some'
+  }
+
   /** Prévient si la sélection repose sur des index en mode serveur. */
   private warnUnstableRowIds(): void {
     if (!this.isSelectionEnabled() || this.clientSource) return
@@ -998,7 +1095,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     for (const [index, node] of this.renderedRows) {
       const row = this.cache.getRow(index)
       if (!row) continue
-      const selected = this.selection.isSelected(this.rowId(row, index))
+      const selected = this.rowShownSelected(row, index)
       node.classList.toggle(`${NS}-row-selected`, selected)
       node.setAttribute('aria-selected', String(selected))
       const box = node.querySelector<HTMLInputElement>(`.${NS}-select-box`)
@@ -1010,14 +1107,14 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   private syncHeaderCheckbox(): void {
     const box = this.headerRenderer.element.querySelector<HTMLInputElement>(`.${NS}-select-all-box`)
     if (!box) return
-    const state = this.selection.headerState(this.cache.getRowCount())
+    const state = this.headerCheckboxState()
     box.checked = state === 'all'
     box.indeterminate = state === 'some'
   }
 
   /** Case d'en-tête « tout sélectionner ». Consommée par le rendu d'en-tête. */
   buildSelectAllCheckbox(): HTMLElement {
-    const state = this.selection.headerState(this.cache.getRowCount())
+    const state = this.headerCheckboxState()
     const box = el('input', {
       class: `${NS}-select-all-box`,
       attrs: {
@@ -1029,8 +1126,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       on: {
         click: (e: MouseEvent) => e.stopPropagation(),
         change: (e: Event) => {
-          const on = (e.target as HTMLInputElement).checked
-          on ? this.selection.selectAll() : this.selection.clear()
+          this.toggleAllFromHeader((e.target as HTMLInputElement).checked)
         },
       },
     })
@@ -1076,8 +1172,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const filtresChanges = filterSignature !== this.lastFilterSignature
     if (filtresChanges) {
       this.lastFilterSignature = filterSignature
-      this.selection.clear()
-      this.lastSelectedIndex = null
+      this.onFilterSetChanged()
     }
 
     const signature = this.dataSignature()
@@ -1104,6 +1199,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     this.renderOverlay()
     // « Tout sauf » : le nombre de lignes sélectionnées suit le total chargé
     this.selectionBar?.render()
+    // Cases non sélectionnables ou sélection énumérée : l'en-tête se lit sur
+    // les lignes affichées, qui viennent d'arriver.
+    if (this.options.isRowSelectable || this.options.keepSelectionOnFilter) this.syncHeaderCheckbox()
+    this.restorePendingFocus()
   }
 
   private onLoadError(error: unknown): void {
@@ -1545,7 +1644,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     level = 0,
   ): HTMLElement {
     const selected = row != null && this.isSelectionEnabled()
-      && this.selection.isSelected(this.rowId(row, index))
+      && this.rowShownSelected(row, index)
+    const noncochable = row != null && this.isSelectionEnabled() && !this.rowSelectable(row)
 
     const node = el('div', {
       class: [
@@ -1553,6 +1653,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
         index % 2 === 1 ? `${NS}-row-odd` : '',
         row ? '' : `${NS}-row-loading`,
         selected ? `${NS}-row-selected` : '',
+        noncochable ? `${NS}-row-unselectable` : '',
         /* Ce que l'hôte veut marquer : un statut, une alerte, une couleur
            métier. Ajouté après les classes de la grille, jamais à leur place. */
         ...(row ? this.classesHote(row, index) : []),
@@ -1857,7 +1958,10 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   /** Case d'un groupe : coche ou décoche toutes ses feuilles d'un coup. */
   private buildGroupCheckbox(group: import('../core/grouping').GroupNode<TRow>): HTMLElement {
     const leaves = this.collectLeaves(group)
-    const ids = leaves.map((r, i) => this.rowId(r, i))
+    const ids = leaves
+      .map((r, i) => ({ r, id: this.rowId(r, i) }))
+      .filter(x => this.rowSelectable(x.r))
+      .map(x => x.id)
     const selectedCount = ids.filter(id => this.selection.isSelected(id)).length
     const all = ids.length > 0 && selectedCount === ids.length
 
@@ -2354,6 +2458,20 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
 
   private buildRowCheckbox(row: TRow, rowIndex: number): HTMLElement {
     const id = this.rowId(row, rowIndex)
+    if (!this.rowSelectable(row)) {
+      // Case grisée et inerte : ni clic, ni tabulation, ni barre d'espace.
+      return el('input', {
+        class: `${NS}-select-box ${NS}-select-box-disabled`,
+        attrs: {
+          type: 'checkbox',
+          disabled: true,
+          'aria-disabled': 'true',
+          'aria-label': this.t.t('rowNotSelectable'),
+          title: this.t.t('rowNotSelectable'),
+        },
+        on: { click: (e: MouseEvent) => { e.stopPropagation(); e.preventDefault() } },
+      })
+    }
     return el('input', {
       class: `${NS}-select-box`,
       attrs: {
@@ -2393,6 +2511,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   private applySelectionClick(row: TRow, rowIndex: number, extend: boolean): void {
+    if (!this.rowSelectable(row)) return
     const id = this.rowId(row, rowIndex)
 
     if (this.options.rowSelection === 'single') {
@@ -2408,7 +2527,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
       const ids: string[] = []
       for (let i = from; i <= to; i++) {
         const r = this.cache.getRow(i)
-        if (r) ids.push(this.rowId(r, i))
+        if (r && this.rowSelectable(r)) ids.push(this.rowId(r, i))
       }
       this.selection.selectRange(ids, target)
       this.lastSelectedIndex = rowIndex
@@ -2532,7 +2651,8 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
           class: `${NS}-status-selection`,
           text: sel.isAll && sel.count == null
             ? this.t.t('allRowsSelected')
-            : `${this.t.number(sel.count ?? 0)} ${this.t.t('selected')}`,
+            : `${this.t.number(sel.count ?? 0)} ${this.t.t('selected')}`
+              + (sel.hidden ? ` ${this.t.t('selectionHidden').replace('{n}', this.t.number(sel.hidden))}` : ''),
         }))
         this.statusEl.append(el('button', {
           class: `${NS}-btn ${NS}-btn-ghost ${NS}-btn-sm`,
@@ -2811,8 +2931,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const filtresChanges = filterSignature !== this.lastFilterSignature
     if (filtresChanges) {
       this.lastFilterSignature = filterSignature
-      this.selection.clear()
-      this.lastSelectedIndex = null
+      this.onFilterSetChanged()
     }
     const signature = this.dataSignature()
     const donneesChangees = signature !== this.lastDataSignature
@@ -3171,12 +3290,92 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     if (!options.gardeSections) void this.fetchSections()
   }
 
-  setRows(rows: TRow[]): void {
+  setRows(rows: TRow[], options: SetRowsOptions = {}): void {
     if (!this.clientSource) {
       throw new Error('IsoGrid: `setRows` n\'existe qu\'en mode client. En mode serveur, utiliser `refresh()`.')
     }
-    this.clientSource.setRows(rows)
-    this.reload()
+    const keepScroll = options.keepScroll ?? this.options.keepScrollOnSetRows ?? false
+    if (!keepScroll) {
+      this.clientSource.setRows(rows)
+      this.reload()
+      return
+    }
+    this.setRowsKeepingPlace(rows)
+  }
+
+  /**
+   * `setRows` sans bouger (0.32.0) : défilement, focus et ancrage du Maj-clic
+   * sont relevés AVANT le remplacement et reposés après, la ligne étant
+   * retrouvée par son identifiant — son index a pu changer.
+   *
+   * Le total connu est conservé le temps que les nouvelles lignes arrivent
+   * (`cache.refresh()`) : sans cela, le corps se réduirait à un bloc et le
+   * navigateur ramènerait le défilement en haut avant qu'on le repose.
+   */
+  private setRowsKeepingPlace(rows: TRow[]): void {
+    const clientSource = this.clientSource!
+    const top = this.viewport.scrollTop
+    const left = this.viewport.scrollLeft
+
+    const avant = clientSource.getResolvedRows(this.buildRequestContext())
+    const ancre = this.lastSelectedIndex != null && avant[this.lastSelectedIndex] !== undefined
+      ? this.rowId(avant[this.lastSelectedIndex], this.lastSelectedIndex)
+      : null
+    const focus = this.focusedCellRef()
+
+    clientSource.setRows(rows)
+    this.lastError = null
+    this.cache.refresh()
+    this.cache.requestContext = this.buildRequestContext()
+    this.renderedRows.clear()
+    this.sectionNodes.clear()
+    this.bodyEl.replaceChildren()
+    this.rebuildGroups()
+
+    if (ancre !== null) {
+      const apres = clientSource.getResolvedRows(this.cache.requestContext)
+      const i = apres.findIndex((r, idx) => this.rowId(r, idx) === ancre)
+      this.lastSelectedIndex = i >= 0 ? i : null
+    }
+
+    this.viewport.scrollTop = top
+    this.viewport.scrollLeft = left
+    this.refreshVisibleRange()
+    this.renderStatus()
+    this.renderFooter()
+    this.renderOverlay()
+    this.syncHeaderCheckbox()
+    this.selectionBar?.render()
+    if (this.sectionsConfig()) void this.fetchSections()
+    if (focus) this.pendingFocus = focus
+  }
+
+  /** Repère la cellule qui a le focus, par identifiant de ligne et de colonne. */
+  private focusedCellRef(): { rowId: string; colId: string | null } | null {
+    const actif = (this.root.getRootNode() as Document | ShadowRoot).activeElement
+    if (!actif || !this.bodyEl.contains(actif)) return null
+    const ligne = actif.closest<HTMLElement>(`.${NS}-row`)
+    const rowId = ligne?.dataset.rowId
+    if (!rowId) return null
+    const cellule = actif.closest<HTMLElement>('[data-col-id]')
+    return { rowId, colId: cellule?.getAttribute('data-col-id') ?? null }
+  }
+
+  /** Rend le focus à la cellule relevée par `setRowsKeepingPlace`, si elle est dessinée. */
+  private restorePendingFocus(): void {
+    const ref = this.pendingFocus
+    if (!ref) return
+    const echappe = (v: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(v) : v.replace(/["\\]/g, '\\$&'))
+    const ligne = this.bodyEl.querySelector<HTMLElement>(`.${NS}-row[data-row-id="${echappe(ref.rowId)}"]`)
+    if (!ligne || ligne.dataset.skeleton) return
+    this.pendingFocus = null
+    const cellule = ref.colId
+      ? ligne.querySelector<HTMLElement>(`[data-col-id="${echappe(ref.colId)}"]`)
+      : null
+    const cible = cellule?.querySelector<HTMLElement>('input:not([disabled]), button, a[href], [tabindex]')
+      ?? (cellule?.hasAttribute('tabindex') ? cellule : null)
+      ?? (ligne.hasAttribute('tabindex') ? ligne : null)
+    cible?.focus({ preventScroll: true })
   }
 
   getDisplayedRowCount(): number | null {
@@ -3362,13 +3561,52 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     const out: TRow[] = []
     const loaded = this.cache.getLoadedRows()
     loaded.forEach((row, i) => {
-      if (this.selection.isSelected(this.rowId(row, i))) out.push(row)
+      if (this.rowShownSelected(row, i)) out.push(row)
     })
+    // Lignes cochées que le filtre masque (keepSelectionOnFilter, mode
+    // client) : elles restent sélectionnées, l'hôte doit les recevoir.
+    if (this.clientSource && this.options.keepSelectionOnFilter && this.selection.getMode() === 'include') {
+      const vus = new Set(this.displayedClientRows().map(r => r.id))
+      this.clientSource.getAllRows().forEach((row, i) => {
+        const id = this.rowId(row, i)
+        if (!vus.has(id) && this.selection.isSelected(id) && this.rowSelectable(row)) out.push(row)
+      })
+    }
     return out
   }
 
   getSelection(): SelectionSnapshot {
-    return this.selection.getSnapshot(this.cache.getRowCount())
+    const total = this.cache.getRowCount()
+    const exclues = this.unselectableIds(this.selection.getMode() === 'include' ? 'all' : 'displayed')
+    const keep = this.clientSource != null && this.options.keepSelectionOnFilter === true
+    if (!exclues && !keep) return this.selection.getSnapshot(total)
+
+    const state = this.selection.getState()
+    if (state.mode === 'include') {
+      const ids = exclues ? state.ids.filter(id => !exclues.has(id)) : state.ids
+      let hidden: number | undefined
+      let isAll = false
+      if (this.clientSource) {
+        const affichees = this.displayedClientRows()
+        const vus = new Set(affichees.map(r => r.id))
+        if (keep) hidden = ids.filter(id => !vus.has(id)).length
+        const cochables = affichees.filter(r => !exclues?.has(r.id))
+        isAll = cochables.length > 0 && cochables.every(r => this.selection.isSelected(r.id))
+      }
+      return {
+        mode: 'include',
+        ids,
+        count: ids.length,
+        isEmpty: ids.length === 0,
+        isAll,
+        ...(hidden !== undefined ? { hidden } : {}),
+      }
+    }
+
+    // « Tout sauf » : les lignes connues non sélectionnables rejoignent les exclues.
+    const ids = Array.from(new Set([...state.ids, ...(exclues ?? [])]))
+    const count = total == null ? null : Math.max(0, total - ids.length)
+    return { mode: 'exclude', ids, count, isEmpty: count === 0, isAll: state.ids.length === 0 }
   }
 
   setSelection(state: SelectionState | null): void {
@@ -3380,6 +3618,7 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
     /* En mode `single`, choisir une ligne retire la précédente — sinon l'appel
      * par programme produirait une sélection multiple que le clic, lui, ne
      * peut pas produire. */
+    if (selected && this.unselectableIds()?.has(rowId)) return
     if (selected && this.options.rowSelection === 'single') {
       this.selection.selectOnly(rowId)
       return
@@ -3388,11 +3627,25 @@ export class IsoGrid<TRow extends AnyRow = AnyRow> implements IsoGridApi<TRow> {
   }
 
   isRowSelected(rowId: string): boolean {
+    if (this.unselectableIds()?.has(rowId)) return false
     return this.selection.isSelected(rowId)
   }
 
   selectAll(): void {
+    if (this.enumeratesSelectAll()) {
+      // Mode client avec une option 0.32.0 : on coche les lignes affichées et
+      // cochables, une à une — le mode « tout sauf » ne saurait pas écarter
+      // les non sélectionnables, ni survivre à un changement de filtre.
+      this.selection.selectRange(
+        this.displayedClientRows().filter(r => this.rowSelectable(r.row)).map(r => r.id),
+        true,
+      )
+      return
+    }
     this.selection.selectAll()
+    // Mode serveur : les lignes chargées non sélectionnables sont exclues.
+    const exclues = this.unselectableIds()
+    if (exclues && exclues.size > 0) this.selection.selectRange([...exclues], false)
   }
 
   deselectAll(): void {

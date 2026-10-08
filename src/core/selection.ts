@@ -46,6 +46,12 @@ export interface SelectionSnapshot extends SelectionState {
   isEmpty: boolean
   /** Vrai si toutes les lignes du jeu filtré sont sélectionnées. */
   isAll: boolean
+  /**
+   * Lignes sélectionnées mais masquées par le filtre ou la recherche (0.32.0).
+   * Renseigné seulement avec `keepSelectionOnFilter` en mode client — ailleurs
+   * une ligne masquée ne peut pas rester sélectionnée. Compris dans `count`.
+   */
+  hidden?: number
 }
 
 /** État d'une case à cocher d'en-tête : ni cochée, partielle, ou cochée. */
@@ -63,6 +69,10 @@ export class SelectionModel {
 
   isSelected(id: string): boolean {
     return this.mode === 'include' ? this.ids.has(id) : !this.ids.has(id)
+  }
+
+  getMode(): SelectionMode {
+    return this.mode
   }
 
   getState(): SelectionState {

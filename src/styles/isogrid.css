@@ -1276,6 +1276,14 @@ body.isg-resizing { cursor: col-resize; user-select: none; }
 .isg-select-box:focus-visible,
 .isg-select-box:checked { opacity: 1; }
 
+/* Ligne non sélectionnable (isRowSelectable, 0.32.0) : case grisée, inerte,
+   qui ne se ravive pas au survol. */
+.isg-select-box.isg-select-box-disabled,
+.isg-row:hover .isg-select-box.isg-select-box-disabled {
+  opacity: .25;
+  cursor: not-allowed;
+}
+
 .isg-row-selected { background: var(--isg-accent-soft); }
 .isg-striped .isg-row-selected.isg-row-odd { background: var(--isg-accent-soft); }
 .isg-row-selected:hover { background: var(--isg-accent-soft); }

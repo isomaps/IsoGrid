@@ -47,6 +47,8 @@ export class SelectionBar {
         ? t.t('allRowsSelected')
         : (this.options.countLabel?.(n)
           ?? (n === 1 ? t.t('selectionBarCountOne') : t.t('selectionBarCount').replace('{n}', t.number(n))))
+        // Lignes cochées que le filtre masque (keepSelectionOnFilter, 0.32.0)
+        + (sel.hidden ? ` ${t.t('selectionHidden').replace('{n}', t.number(sel.hidden))}` : '')
 
     const children: HTMLElement[] = [el('span', { class: `${NS}-selection-bar-count`, text: compte, attrs: { 'aria-live': 'polite' } })]
     for (const action of this.options.actions) {
