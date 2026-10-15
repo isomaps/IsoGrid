@@ -124,6 +124,11 @@ Cinq types : `text`, `number`, `date`, `boolean`, `set`. Jusqu'à deux
 conditions par colonne, jointes par `ET`/`OU`. Les opérateurs sont fermés
 (table de correspondance côté serveur, jamais de concaténation).
 
+La **recherche rapide** lit toutes les colonnes affichées. `quickFilter: false`
+sur une colonne l'en retire sans toucher à son filtre : une colonne de statut
+(« Production », « Bac à sable ») ou de serveur faisait sinon remonter presque
+toutes les lignes sur « pro » ou « app » (0.33.0, mode client).
+
 Le type est déduit du `type` de colonne ; `filter: false` désactive, un objet
 `{ type, operators, defaultOperator, debounce, hideSearch }` affine.
 

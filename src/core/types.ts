@@ -96,6 +96,15 @@ export interface ColumnDef<TRow = AnyRow> {
    */
   filter?: boolean | FilterType | ColumnFilterConfig
 
+  /**
+   * Colonne lue par la recherche rapide (mode client). `false` : la colonne
+   * reste visible, triable et filtrable, mais la recherche l'ignore. Sert aux
+   * colonnes de statut ou de catégorie : « Production » ou « app.idfuse.fr »
+   * faisaient remonter presque toutes les lignes sur « pro » ou « app »
+   * (0.33.0). En mode serveur, c'est le serveur qui choisit ses colonnes.
+   */
+  quickFilter?: boolean
+
   align?: Align
 
   /** Empêche l'utilisateur de masquer la colonne depuis la sidebar. */

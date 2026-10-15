@@ -240,7 +240,7 @@ export function applyFilters<TRow>(
   if (entries.length === 0 && !q) return rows
 
   const byId = new Map(columns.map(c => [c.id, c]))
-  const quickCols = columns.filter(c => c.hide !== true)
+  const quickCols = columns.filter(c => c.hide !== true && c.quickFilter !== false)
 
   return rows.filter((row) => {
     for (const [colId, model] of entries) {
