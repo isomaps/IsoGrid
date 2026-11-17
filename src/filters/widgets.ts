@@ -230,8 +230,16 @@ export class FilterEditor {
     const host = el('div', { class: `${NS}-filter-set` })
     this.element.append(host)
 
+    // Le champ de recherche est créé une seule fois et n'est jamais retiré du
+    // DOM : `paint()` ne redessine que ce qui suit. Le recréer à chaque
+    // caractère faisait perdre le focus (et la position du curseur) à chaque
+    // lettre tapée (0.33.1).
+    let search: HTMLInputElement | null = null
+
     const paint = () => {
-      host.replaceChildren()
+      for (const child of Array.from(host.children)) {
+        if (child !== search) child.remove()
+      }
 
       if (this.setOptions == null) {
         host.append(el('div', {
@@ -241,8 +249,8 @@ export class FilterEditor {
         return
       }
 
-      if (!this.config.hideSearch) {
-        host.append(el('input', {
+      if (!this.config.hideSearch && !search) {
+        search = el('input', {
           class: `${NS}-input ${NS}-filter-search`,
           attrs: { type: 'search', placeholder: this.ctx.t.t('searchValues'), value: this.setSearch },
           on: {
@@ -251,7 +259,15 @@ export class FilterEditor {
               paint()
             },
           },
-        }))
+        }) as HTMLInputElement
+        host.prepend(search)
+        // Les valeurs arrivent après l'ouverture du popover : le champ prend le
+        // focus, sauf si l'utilisateur est déjà allé ailleurs entre-temps.
+        const actif = (host.getRootNode() as Document | ShadowRoot).activeElement
+        const popover = host.closest(`.${NS}-filter-popover`)
+        if (host.isConnected && (!actif || actif === document.body || popover?.contains(actif))) {
+          search.focus()
+        }
       }
 
       const needle = this.setSearch.trim().toLocaleLowerCase()
